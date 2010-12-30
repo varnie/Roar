@@ -65,6 +65,9 @@ class LastFMClient(IWSData):
     def getArtistTags(self,artist,autocorrect=0):
         return ArtistRequest(self,Request.POST_TYPE).getTags(artist,autocorrect)
 
+    def artistShare(self,artist,recipients,messsage=None,public=0):
+        return ArtistRequest(self,Request.POST_TYPE).share(artist,recipients,messsage,public)
+
 if __name__=="__main__":
 
     URL="ws.audioscrobbler.com"
@@ -79,7 +82,7 @@ if __name__=="__main__":
 
         print "invocation client.token: ", client.token
         print "invocation client.mobileSession: ", client.mobileSession
-        print "invocation client.shout: ", client.shout("varnie","this is a test")
+        print "invocation client.shout: ", client.shout("varnie","privet so")
 
         tags = ['m','e','t','a','l','l']
         print "client.addTags invocation", client.addTags("Behemoth",tags)
@@ -92,7 +95,7 @@ if __name__=="__main__":
         print "client.getCorrection invocation", client.getCorrection("Guns N")
         print "client.getArtistShouts invocation", client.getArtistShouts("Behemoth")
         print "client.getArtistSimilar invocation", client.getArtistSimilar("Behemoth")
-    
+        print "client.artistShare invocation",client.artistShare("Behemoth",["varnie"],"tettttwoho! cool band!")    
     except errors.Error, e:
         print e
 

@@ -6,6 +6,7 @@ import errors
 import urllib
 import urlparse
 import urllib2
+import re
 
 def url_fix(s, charset='utf-8'):
     if isinstance(s, unicode):
@@ -141,6 +142,9 @@ class UserRequest(Request):
 
 
 class ArtistRequest(Request):
+
+    re_email=re.compile(r"(?:^|\s)[-a-z0-9_.]+@(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)",re.IGNORECASE)
+
     def __init__(self,wsdata,rtype):
         super(ArtistRequest,self).__init__(wsdata,rtype)
 
@@ -190,4 +194,22 @@ class ArtistRequest(Request):
         self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect)})
         ret=self.call("artist.getSimilar",False)
         return [(xmlutils.extract_subelem(artist,"name").text, xmlutils.extract_subelem(artist,"url").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
+    
+    def share(self,artist,recipients,message=None,public=0):
+        if len(recipients) < 0 or len(recipients) > 10:
+            raise errors.Error("wrong recipients count supplied")
+
+        for user in recipients:
+            if "@" in user and not ArtistRequest.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
+
+        if public not in (0,1):
+            raise errors.Error("wrong public supplied")
+
+        if message:
+            self._paramsMap["message"]=message
+        
+        self._paramsMap.update({"artist":artist,"recipient":",".join(recipients),"public":str(public),"sk":self._wsdata.mobileSession})
+        ret=self.call("artist.share",True)
+        return xmlutils.extract_elem(ret,"status",True) 
 
