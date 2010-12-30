@@ -56,6 +56,14 @@ class LastFMClient(IWSData):
     def getCorrection(self,artist):
         return ArtistRequest(self,Request.GET_TYPE).getCorrection(artist)
 
+    def getArtistShouts(self,artist,limit=50,autocorrect=0,page=None):
+        return ArtistRequest(self,Request.GET_TYPE).getShouts(artist,limit,autocorrect,page)
+
+    def getArtistSimilar(self,artist,autocorrect=0):
+        return ArtistRequest(self,Request.GET_TYPE).getSimilar(artist,autocorrect)
+
+    def getArtistTags(self,artist,autocorrect=0):
+        return ArtistRequest(self,Request.POST_TYPE).getTags(artist,autocorrect)
 
 if __name__=="__main__":
 
@@ -75,11 +83,16 @@ if __name__=="__main__":
 
         tags = ['m','e','t','a','l','l']
         print "client.addTags invocation", client.addTags("Behemoth",tags)
+     
+        print "client.getArtistTags invocation", client.getArtistTags("Behemoth")
+        print "client.removeTag invocation"
         for tag in tags:
             print client.removeTag("Behemoth",tag)
 
         print "client.getCorrection invocation", client.getCorrection("Guns N")
-
+        print "client.getArtistShouts invocation", client.getArtistShouts("Behemoth")
+        print "client.getArtistSimilar invocation", client.getArtistSimilar("Behemoth")
+    
     except errors.Error, e:
         print e
 

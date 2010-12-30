@@ -157,9 +157,37 @@ class ArtistRequest(Request):
         ret=self.call("artist.removeTag",True)
         return xmlutils.extract_elem(ret,"status",True)
 
+    def getTags(self,artist,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorect supplied")
+        self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect),"sk":self._wsdata.mobileSession})
+        ret=self.call("artist.getTags",True)
+        return [(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag") ]         
+
     def getCorrection(self,artist):
         self._paramsMap.update({"artist":artist})
         ret=self.call("artist.getCorrection",False)
         return [i.text for i in xmlutils.extract_elems(ret,".//correction/artist/name")]
 
-    
+    def getShouts(self,artist,limit=50,autocorrect=0,page=None):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+        if page: 
+            if page > limit:
+                raise errors.Error("wrong page supplied")
+            self._paramsMap["page"]=page
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect),"limit":limit})
+        ret=self.call("artist.getShouts",False)
+        return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
+ 
+    def getSimilar(self,artist,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+        self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect)})
+        ret=self.call("artist.getSimilar",False)
+        return [(xmlutils.extract_subelem(artist,"name").text, xmlutils.extract_subelem(artist,"url").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
+
