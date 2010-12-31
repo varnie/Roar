@@ -135,7 +135,7 @@ class UserRequest(Request):
     def __init__(self,wsdata,rtype):
       super(UserRequest,self).__init__(wsdata,rtype)
 
-    def shout(self,user,message):
+    def userShout(self,user,message):
         self._paramsMap.update({"user":user,"message":message,"sk":self._wsdata.mobileSession})
         ret=self.call("user.Shout",True)
         return xmlutils.extract_elem(ret,"status",True)
@@ -148,7 +148,7 @@ class ArtistRequest(Request):
     def __init__(self,wsdata,rtype):
         super(ArtistRequest,self).__init__(wsdata,rtype)
 
-    def addTags(self,artist,tags):
+    def addArtistTags(self,artist,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
@@ -156,24 +156,24 @@ class ArtistRequest(Request):
         ret=self.call("artist.addTags",True)
         return xmlutils.extract_elem(ret,"status",True)
 
-    def removeTag(self,artist,tag):
+    def removeArtistTag(self,artist,tag):
         self._paramsMap.update({"artist":artist,"tag":tag,"sk":self._wsdata.mobileSession})
         ret=self.call("artist.removeTag",True)
         return xmlutils.extract_elem(ret,"status",True)
 
-    def getTags(self,artist,autocorrect=0):
+    def getArtistTags(self,artist,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
         self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect),"sk":self._wsdata.mobileSession})
         ret=self.call("artist.getTags",True)
         return [(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag") ]         
 
-    def getCorrection(self,artist):
+    def getArtistCorrection(self,artist):
         self._paramsMap.update({"artist":artist})
         ret=self.call("artist.getCorrection",False)
         return [i.text for i in xmlutils.extract_elems(ret,".//correction/artist/name")]
 
-    def getShouts(self,artist,limit=50,autocorrect=0,page=None):
+    def getArtistShouts(self,artist,limit=50,autocorrect=0,page=None):
         if limit < 0:
             raise errors.Error("wrong limit supplied")
         if page: 
@@ -188,14 +188,14 @@ class ArtistRequest(Request):
         ret=self.call("artist.getShouts",False)
         return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
  
-    def getSimilar(self,artist,autocorrect=0):
+    def getArtistSimilar(self,artist,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
         self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect)})
         ret=self.call("artist.getSimilar",False)
         return [(xmlutils.extract_subelem(artist,"name").text, xmlutils.extract_subelem(artist,"url").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
     
-    def share(self,artist,recipients,message=None,public=0):
+    def artistShare(self,artist,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
             raise errors.Error("wrong recipients count supplied")
 
@@ -212,4 +212,28 @@ class ArtistRequest(Request):
         self._paramsMap.update({"artist":artist,"recipient":",".join(recipients),"public":str(public),"sk":self._wsdata.mobileSession})
         ret=self.call("artist.share",True)
         return xmlutils.extract_elem(ret,"status",True) 
+
+    def artistShout(self,artist,message):
+        self._paramsMap.update({"artist":artist,"message":message,"sk":self._wsdata.mobileSession})
+        ret=self.call("artist.shout",True)
+        return xmlutils.extract_elem(ret,"status",True)
+    
+    def artistSearch(self,artist,limit=30,page=1):
+        if limit < 0 or  limit > 30:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+
+        self._paramsMap.update({"artist":artist,"limit":str(limit),"page":str(page)})
+        ret=self.call("artist.search",False)
+        #return ret
+
+        return [(xmlutils.extract_subelem(artist,"name").text,
+            xmlutils.extract_subelem(artist,"url").text) for artist in
+            xmlutils.extract_elems(ret,".//artistmatches/artist")]
+    
+
+
+
 

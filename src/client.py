@@ -44,29 +44,36 @@ class LastFMClient(IWSData):
     def token(self):
         return AuthRequest(self,Request.GET_TYPE).getToken()
 
-    def shout(self,user,message):
-        return UserRequest(self,Request.POST_TYPE).shout(user,message)
+    def userShout(self,user,message):
+        return UserRequest(self,Request.POST_TYPE).userShout(user,message)
 
-    def addTags(self,artist,tags):
-        return ArtistRequest(self,Request.POST_TYPE).addTags(artist,tags)
+    def addArtistTags(self,artist,tags):
+        return ArtistRequest(self,Request.POST_TYPE).addArtistTags(artist,tags)
 
-    def removeTag(self,artist,tag):
-        return ArtistRequest(self,Request.POST_TYPE).removeTag(artist,tag)
+    def removeArtistTag(self,artist,tag):
+        return ArtistRequest(self,Request.POST_TYPE).removeArtistTag(artist,tag)
 
-    def getCorrection(self,artist):
-        return ArtistRequest(self,Request.GET_TYPE).getCorrection(artist)
+    def getArtistCorrection(self,artist):
+        return ArtistRequest(self,Request.GET_TYPE).getArtistCorrection(artist)
 
     def getArtistShouts(self,artist,limit=50,autocorrect=0,page=None):
-        return ArtistRequest(self,Request.GET_TYPE).getShouts(artist,limit,autocorrect,page)
+        return ArtistRequest(self,Request.GET_TYPE).getArtistShouts(artist,limit,autocorrect,page)
 
     def getArtistSimilar(self,artist,autocorrect=0):
-        return ArtistRequest(self,Request.GET_TYPE).getSimilar(artist,autocorrect)
+        return ArtistRequest(self,Request.GET_TYPE).getArtistSimilar(artist,autocorrect)
 
     def getArtistTags(self,artist,autocorrect=0):
-        return ArtistRequest(self,Request.POST_TYPE).getTags(artist,autocorrect)
+        return ArtistRequest(self,Request.POST_TYPE).getArtistTags(artist,autocorrect)
 
     def artistShare(self,artist,recipients,messsage=None,public=0):
-        return ArtistRequest(self,Request.POST_TYPE).share(artist,recipients,messsage,public)
+        return ArtistRequest(self,Request.POST_TYPE).artistShare(artist,recipients,messsage,public)
+    
+    def artistShout(self,artist,message):
+        return ArtistRequest(self,Request.POST_TYPE).artistShout(artist,message)
+
+    def artistSearch(self,artist,limit=30,page=1):
+        return ArtistRequest(self,Request.GET_TYPE).artistSearch(artist,limit,page)
+
 
 if __name__=="__main__":
 
@@ -82,20 +89,24 @@ if __name__=="__main__":
 
         print "invocation client.token: ", client.token
         print "invocation client.mobileSession: ", client.mobileSession
-        print "invocation client.shout: ", client.shout("varnie","privet so")
+        print "invocation client.shout: ", client.userShout("varnie","privet so")
 
         tags = ['m','e','t','a','l','l']
-        print "client.addTags invocation", client.addTags("Behemoth",tags)
+        print "client.addTags invocation", client.addArtistTags("Behemoth",tags)
      
         print "client.getArtistTags invocation", client.getArtistTags("Behemoth")
         print "client.removeTag invocation"
         for tag in tags:
-            print client.removeTag("Behemoth",tag)
+            print client.removeArtistTag("Behemoth",tag)
 
-        print "client.getCorrection invocation", client.getCorrection("Guns N")
+        print "client.getCorrection invocation", client.getArtistCorrection("Guns N")
         print "client.getArtistShouts invocation", client.getArtistShouts("Behemoth")
         print "client.getArtistSimilar invocation", client.getArtistSimilar("Behemoth")
         print "client.artistShare invocation",client.artistShare("Behemoth",["varnie"],"tettttwoho! cool band!")    
+        print "client.artistShout invocation",client.artistShout("Behemoth","I\
+                glad Behemoth became an artist of the year 2010 in Poland!\
+                Horns up\m/")
+        print "client.artistSearch invocation", client.artistSearch("Sepultura")
     except errors.Error, e:
         print e
 
