@@ -74,6 +74,8 @@ class LastFMClient(IWSData):
     def artistSearch(self,artist,limit=30,page=1):
         return ArtistRequest(self,Request.GET_TYPE).artistSearch(artist,limit,page)
 
+    def artistGetEvents(self,artist,autocorrect=0):
+        return ArtistRequest(self,Request.GET_TYPE).artistGetEvents(artist,autocorrect)
 
 if __name__=="__main__":
 
@@ -90,15 +92,15 @@ if __name__=="__main__":
         print "invocation client.token: ", client.token
         print "invocation client.mobileSession: ", client.mobileSession
         print "invocation client.shout: ", client.userShout("varnie","privet so")
-
+  
         tags = ['m','e','t','a','l','l']
         print "client.addTags invocation", client.addArtistTags("Behemoth",tags)
-     
+  
         print "client.getArtistTags invocation", client.getArtistTags("Behemoth")
         print "client.removeTag invocation"
         for tag in tags:
-            print client.removeArtistTag("Behemoth",tag)
-
+             print client.removeArtistTag("Behemoth",tag)
+  
         print "client.getCorrection invocation", client.getArtistCorrection("Guns N")
         print "client.getArtistShouts invocation", client.getArtistShouts("Behemoth")
         print "client.getArtistSimilar invocation", client.getArtistSimilar("Behemoth")
@@ -107,7 +109,8 @@ if __name__=="__main__":
                 glad Behemoth became an artist of the year 2010 in Poland!\
                 Horns up\m/")
         print "client.artistSearch invocation", client.artistSearch("Sepultura")
+        print "client.artistGetEvents invocation",client.artistGetEvents("Sepultura") 
     except errors.Error, e:
-        print e
+       print e
 
 

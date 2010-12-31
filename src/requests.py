@@ -233,7 +233,14 @@ class ArtistRequest(Request):
             xmlutils.extract_subelem(artist,"url").text) for artist in
             xmlutils.extract_elems(ret,".//artistmatches/artist")]
     
-
-
+    def artistGetEvents(self,artist,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+        self._paramsMap.update({"artist":artist,"autocorrect":str(autocorrect)})
+        ret=self.call("artist.getEvents",False)
+        return [(xmlutils.extract_subelem(event,"name").text,
+            xmlutils.extract_subelem(event,"url").text) for event in
+            xmlutils.extract_elems(ret,".//events/event/venue")]
+                
 
 
