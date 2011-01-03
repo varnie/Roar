@@ -11,6 +11,9 @@ from collections import namedtuple
 
 TagType = namedtuple("Tag","name,url")
 
+def encode(s, charset='utf-8'):
+    return s.encode(charset,'ignore')
+
 def url_fix(s, charset='utf-8'):
     if isinstance(s, unicode):
         s = s.encode(charset, 'ignore')
@@ -139,7 +142,7 @@ class AuthRequest(Request):
 class UserRequest(Request):
     def __init__(self,name):
         super(UserRequest,self).__init__()
-        self._name=name 
+        self._name=encode(name) 
     
     def __repr__(self):
         return self._name
@@ -162,7 +165,7 @@ class ArtistRequest(Request):
 
     def __init__(self,name):
         super(ArtistRequest,self).__init__()
-        self._name=name
+        self._name=encode(name)
 
     def __repr__(self):
         return self._name
@@ -271,7 +274,6 @@ class ArtistRequest(Request):
         self._paramsMap=self._getParams()
         self._paramsMap.update({"limit":str(limit),"page":str(page)})
         ret=self._call_GET("artist.search",False)
-
         return [ArtistRequest(xmlutils.extract_subelem(artist,"name").text) for artist in
             xmlutils.extract_elems(ret,".//artistmatches/artist")]
 
@@ -293,13 +295,13 @@ class EventRequest(Request):
         return "EventRequest"
 
     def __repr__(self):
-        return "EventRequest(%d)" % (self._id)
+        return "EventRequest(%s)" % (str(self._id))
 
     def _getParams(self):
         params={"event":str(self._id)}
         params.update(super(EventRequest,self)._getParams())
         return params
-    
+
     def getID(self):
         return self._id
 
@@ -317,12 +319,10 @@ class EventRequest(Request):
         pass
 
     def getStartDate(self):
-        ret=self._getInfo() 
-        return xmlutils.extract_elem(ret,".//event/startData").text
+        return xmlutils.extract_elem(self._getInfo(),".//event/startData").text
 
     def getDescription(self):
-        ret=self._getInfo()
-        res=xmlutils.extract_elem(ret,".//event/description").text
+        res=xmlutils.extract_elem(self._getInfo(),".//event/description").text
         return res if res else ""
 
     def getImages(self):

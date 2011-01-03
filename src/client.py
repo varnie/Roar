@@ -37,7 +37,7 @@ if __name__=="__main__":
         print "artist.shout: ",artist.shout("I\
                 glad Behemoth became an artist of the year 2010 in Poland!\
                 Horns up\m/")
-        print "artist.search: ", artist.search(4)
+        print "artist.search: ", artist.search(3)
         print "artist.getEvents: ",artist.getEvents()
 
         print "user.shout: ", requests.UserRequest("user_name").shout("this is a test message")
