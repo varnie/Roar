@@ -9,6 +9,9 @@ class BadResponseError(Error):
     def __str__(self):
         return "Wrong response"
 
+    def __repr__(self):
+        return "BadResponseError"
+
 class ResponseError(Error):
     def __init__(self, errorCode, errorMsg, *args, **kwargs):
         super(ResponseError, self).__init__(*args, **kwargs)
@@ -17,3 +20,6 @@ class ResponseError(Error):
 
     def __str__(self):
         return "LastFM Error %s:%s" % (self._errorCode, self._errorMsg)
+
+    def __repr__(self):
+        return "ResponseError(%s %s)" % (self._errorCode, self._errorMsg)

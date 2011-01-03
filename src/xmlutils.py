@@ -13,6 +13,7 @@ def extract_subelem(ownerElem, elemName):
     return ownerElem.find(elemName)
 
 class XMLParser(object):
+
     def __init__(self,XMLbody):
 	self._XMLbody=XMLbody
 	self._xmlTree=self._createXMLTree()
