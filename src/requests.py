@@ -158,7 +158,6 @@ class UserRequest(Request):
         ret=self._call_POST("user.Shout",True)
         return xmlutils.extract_elem(ret,"status",True)
 
-
 class ArtistRequest(Request):
 
     re_email=re.compile(r"(?:^|\s)[-a-z0-9_.]+@(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)",re.IGNORECASE)
@@ -286,13 +285,64 @@ class ArtistRequest(Request):
         return [EventRequest(id.text) for id in
                 xmlutils.extract_elems(ret,".//events/event/id")]
 
+class VenueRequest(Request):
+
+    def __init__(self,id,name):
+        super(VenueRequest,self).__init__()
+        self._id = id
+        self._name=name
+
+    def __repr__(self):
+        return "VenueRequest(%s,%s)" % (self._name,str(self._id))
+
+    def _getParams(self):
+        params={"venue":self._id}
+        params.update(super(VenueRequest,self)._getParams())
+        return params
+
+    def getEvents(self):
+        self._paramsMap=self._getParams()
+        res=self._call_GET("venue.getEvents",False)
+        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for
+                event in xmlutils.extract_elems(res,".//events/event")]
+
+    def getPastEvents(self,page=1,limit=50):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+
+        self._paramsMap=self._getParams()
+        self._paramsMap["limit"]=str(limit)
+        self._paramsMap["page"]=str(page)
+
+        res=self._call_GET("venue.getPastEvents",False)
+
+        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for
+                event in xmlutils.extract_elems(res,".//events/event")]
+
+    def search(self,page=1,limit=50):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+
+        self._paramsMap=self._getParams()
+        self._paramsMap["venue"]=self._name #a must
+        self._paramsMap["limit"]=str(limit)
+        self._paramsMap["page"]=str(page)
+
+        res=self._call_GET("venue.search",False)
+
+        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for event in  xmlutils.extract_elems(res,".//results/venuematches/venue")]
+
 class EventRequest(Request):
+
     def __init__(self,id):
         super(EventRequest,self).__init__()
         self._id=id
-
-    def __str__(self):
-        return "EventRequest"
 
     def __repr__(self):
         return "EventRequest(%s)" % (str(self._id))
@@ -306,44 +356,42 @@ class EventRequest(Request):
         return self._id
 
     def getTitle(self):
-        ret=self._getInfo()
-        return xmlutils.extract_elem(ret,".//event/title").text
+        return xmlutils.extract_elem(self._getInfo(),".//event/title").text
 
     def getArtists(self):
-        ret=self._getInfo()
         return [ArtistRequest(artist.text) for artist in
-                xmlutils.extract_elems(ret,".//event/artists/artist")]
+                xmlutils.extract_elems(self._getInfo(),".//event/artists/artist")]
 
-    def getVenue(self):
-        #TODO
-        pass
+    def getAttendance(self):
+        return xmlutils.extract_elem(self._getInfo(),".//event/attendance").text
+
+    def getReviews(self):
+        return  xmlutils.extract_elem(self._getInfo(),".//event/reviews").text
+
+    def getUrl(self):
+        return xmlutils.extract_elem(self._getInfo(),".//event/url").text
 
     def getStartDate(self):
-        return xmlutils.extract_elem(self._getInfo(),".//event/startData").text
+        return xmlutils.extract_elem(self._getInfo(),".//event/startDate").text
 
     def getDescription(self):
         res=xmlutils.extract_elem(self._getInfo(),".//event/description").text
         return res if res else ""
 
     def getImages(self):
-        #TODO
-        pass
+        return [image.text for image in  xmlutils.extract_elems(self._getInfo(),".//event/image")]
 
-    def getAttendance(self):
-        #TODO
-        pass
+    def getVenue(self):
+        res = xmlutils.extract_elem(self._getInfo(),".//event/venue")
+        return VenueRequest(xmlutils.extract_subelem(res,"id").text,
+                xmlutils.extract_subelem(res,"name").text)
 
     def getTag(self):
         #TODO
         pass
 
-    def getURL(self):
-        #TODO
-        pass
-
     def getWebsite(self):
-        #TODO
-        pass
+        return xmlutils.extract_elem(self._getInfo(),".//event/website").text
 
     def getTickets(self):
         #TODO
