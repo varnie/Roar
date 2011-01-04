@@ -47,10 +47,10 @@ if __name__=="__main__":
             print artist.removeTag("metal"),
         print ""
         print "artist.getShouts: ", artist.getShouts(2)
-        print "artist.getSimilar: ",artist.getSimilar(2)
+        print "artist.getSimilar: ",artist.getSimilar()
         print "artist.share: ",artist.share(["varnie"],"tettttwoho! cool band!11")
         print "artist.shout: ",artist.shout("Horns up\m/")
-        print "artist.search: ", artist.search(2)
+        print "artist.search: ", artist.search()
         print "artist.getEvents: ",artist.getEvents()
 
         #user APIs

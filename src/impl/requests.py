@@ -11,9 +11,6 @@ from collections import namedtuple
 
 TagType = namedtuple("Tag","name,url")
 
-def encode(s, charset='utf-8'):
-    return s.encode(charset,'ignore')
-
 def url_fix(s, charset='utf-8'):
     if isinstance(s, unicode):
         s = s.encode(charset, 'ignore')
@@ -30,6 +27,9 @@ class Request(object):
 
     def _getParams(self):
         return {"api_key":auth.authData.api_key}
+
+    def __repr__(self):
+        return 'Request()'
 
     @property
     def mobileSession(self):
@@ -113,6 +113,9 @@ class AuthRequest(Request):
         super(AuthRequest,self).__init__()
         self._authToken=None
 
+    def __repr__(self):
+        return 'AuthRequest()'
+
     def getToken(self):
         self._paramsMap=self._getParams()
         ret = self._call_GET("auth.getToken",True)
@@ -142,10 +145,10 @@ class AuthRequest(Request):
 class UserRequest(Request):
     def __init__(self,name):
         super(UserRequest,self).__init__()
-        self._name=encode(name) 
-    
+        self._name=name
+
     def __repr__(self):
-        return self._name
+        return 'UserRequest(%r)' % (self._name,)
 
     def _getParams(self):
         params={"user":self._name}
@@ -164,10 +167,10 @@ class ArtistRequest(Request):
 
     def __init__(self,name):
         super(ArtistRequest,self).__init__()
-        self._name=encode(name)
+        self._name=name
 
     def __repr__(self):
-        return self._name
+        return 'ArtistRequest(%r)' % (self._name,)
 
     def getName(self):
         return self._name
@@ -293,7 +296,7 @@ class VenueRequest(Request):
         self._name=name
 
     def __repr__(self):
-        return "VenueRequest(%s,%s)" % (self._name,str(self._id))
+        return "VenueRequest(%r,%r)" % (self._name,self._id)
 
     def _getParams(self):
         params={"venue":self._id}
@@ -345,7 +348,7 @@ class EventRequest(Request):
         self._id=id
 
     def __repr__(self):
-        return "EventRequest(%s)" % (str(self._id))
+        return "EventRequest(%r)" % (self._id)
 
     def _getParams(self):
         params={"event":str(self._id)}
