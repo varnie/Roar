@@ -1,6 +1,6 @@
-import requests
-import errors
-import auth
+import impl.requests as requests
+import impl.errors as errors
+import impl.auth  as auth
 
 if __name__=="__main__":
 
