@@ -15,8 +15,12 @@ def extract_subelem(ownerElem, elemName):
 class XMLParser(object):
 
     def __init__(self,XMLbody):
+	super(XMLParser,self).__init__()
 	self._XMLbody=XMLbody
 	self._xmlTree=self._createXMLTree()
+
+    def __repr__(self):
+	return 'XMLParser(%r)' % (self._XMLbody,)
 
     def _createXMLTree(self):
         parser=xml.XMLTreeBuilder()
@@ -28,14 +32,6 @@ class XMLParser(object):
 
     def extract_elem(self, elemName, searchInRoot=False):
         if searchInRoot:
-            value=self._xmlTree.getroot().get(elemName)
-            #if value is None:
-            #    raise LastFM_client.BadResponseError()
-            #else:
-            return value
+            return self._xmlTree.getroot().get(elemName)
         else:
-            elem=self._xmlTree.find(elemName)
-            #if elem is None:
-            #    raise LastFM_client.BadResponseError()
-            #else:
-            return elem
+            return self._xmlTree.find(elemName)

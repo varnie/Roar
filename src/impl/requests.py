@@ -6,7 +6,6 @@ import urllib
 import urlparse
 import urllib2
 import re
-import auth
 from collections import namedtuple
 
 TagType = namedtuple("Tag","name,url")
@@ -20,38 +19,86 @@ def url_fix(s, charset='utf-8'):
     qs = urllib.quote_plus(qs, ':&=')
     return urlparse.urlunsplit((scheme, netloc, path, qs, anchor))
 
+def statusHandler(ret):
+    return xmlutils.extract_elem(ret,"status",True)
+
+def getShoutsHandler(ret):
+    return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
+
+def getTagsHandler(ret):
+    return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
+
+def getSimilarArtistHandler(ret):
+    return [ArtistRequest(xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
+
 class Request(object):
 
-    class Handler(object):
-        def process(self, ret):
-            pass
-
-    def __init__(self):
-        self._paramsMap={}
-
-    def _getParams(self):
-        return {"api_key":auth.authData.api_key}
+    def __init__(self,client):
+        super(Request,self).__init__()
+        self._client=client
 
     def __repr__(self):
-        return 'Request()'
+        return 'Request(%r)' % (self._client,)
+
+class Client(object):
+
+    def __init__(self,URL,api_key,api_secret,username,password):
+        super(Client,self).__init__()
+        self._URL=URL
+        self._api_key,self._api_secret,self._username,self._password=api_key,api_secret,username,password
+        self._authToken=None
+        self._sk=None
+
+    def __repr(self):
+        return 'Client(%r,%r,%r,%r,%r)' % (self._URL,self._api_key,self._api_secret,self._username,self._password)
+
+    def getToken(self):
+        ret = self.call_GET(addSign=True,method="auth.getToken")
+        return xmlutils.extract_elem(ret,"token").text
 
     @property
     def mobileSession(self):
-        global _authRequest
-        if not _authRequest:
-            _authRequest=AuthRequest()
-        return _authRequest.mobileSession
+        if self._sk is None:
+            ret=self.call_GET(addSign=True,method="auth.getMobileSession",username=self._username,authToken=self.authToken)
+            elem=xmlutils.extract_elem(ret,"session/key")
+            if elem is None:
+                raise errors.BadResponseError()
+            else:
+                self._sk=elem.text
+        return self._sk
 
-    def _call_GET(self, fmfunc, addSign=False):
-        self._paramsMap["method"]=fmfunc
+    @property
+    def authToken(self):
+        if self._authToken is None:
+            m = hashlib.new('md5')
+            m.update(self._password)
+            value = self._username.lower() + m.hexdigest()
+            m = hashlib.new('md5')
+            m.update(value)
 
-        url = "http://%s/2.0/?method=%s" % (auth.URL, fmfunc)
-        for k, v in self._paramsMap.iteritems():
+            self._authToken = m.hexdigest()
+        return self._authToken
+
+    def _fix_params(self,paramsMap):
+        try:
+            paramsMap.pop(None)
+        except KeyError,e:
+            pass
+
+        for k,v in paramsMap.iteritems():
+            paramsMap[k]=str(v)
+
+    def call_GET(self, addSign=False, **paramsMap):
+        self._fix_params(paramsMap)
+        paramsMap['api_key']=self._api_key
+
+        url = "http://%s/2.0/?method=%s" % (self._URL, paramsMap['method'])
+        for k, v in paramsMap.iteritems():
             if k is not "method":
                 url += "&%s=%s" % (k, v)
 
         if addSign:
-            url += "&api_sig=%s" % self.get_sign()
+            url += "&api_sig=%s" % self._get_sign(paramsMap)
 
         url=url_fix(url)
 
@@ -67,18 +114,17 @@ class Request(object):
 
         return resp_string
 
-    def _call_POST(self, fmfunc, addSign=False):
-        self._paramsMap["method"]=fmfunc
+    def call_POST(self,**paramsMap):
+        paramsMap['sk']=self.mobileSession
+        paramsMap['api_key']=self._api_key
+        self._fix_params(paramsMap)
+        paramsMap.update({'api_sig':self._get_sign(paramsMap)})
 
-        if addSign and "api_sig" not in self._paramsMap:
-            self._paramsMap["api_sig"]=self.get_sign()
-
-        params=urllib.urlencode(self._paramsMap)
-        url=url_fix("http://%s/2.0/" % (auth.URL))
+        params=urllib.urlencode(paramsMap)
+        url=url_fix("http://%s/2.0/" % (self._URL,))
 
         headers={"Content-type": "application/x-www-form-urlencoded", "Accept-Charset": "utf-8",
                  "User-Agent": "lastfm_client"}
-
         try:
             request=urllib2.Request(url,params,headers)
             resp_string=urllib2.urlopen(request).read()
@@ -88,17 +134,16 @@ class Request(object):
 
         return resp_string
 
-    def get_sign(self):
+    def _get_sign(self,paramsMap):
         result = []
 
-        for param in sorted(self._paramsMap.keys()):
+        for param,value in sorted(paramsMap.iteritems()):
             encoded_param = param.encode('utf-8')
-            value = self._paramsMap[param]
 
             result.append(encoded_param)
             result.append(value)
 
-        result.append(auth.authData.secret)
+        result.append(self._api_secret)
 
         m=hashlib.new('md5')
         m.update(''.join(result))
@@ -112,200 +157,48 @@ class Request(object):
         else:
             raise errors.ResponseError(elem.get("code"), elem.text)
 
-class StatusHandler(Request.Handler):
-    def process(self,ret):
-        return xmlutils.extract_elem(ret,"status",True)
+class UserRequest(Request):
 
-class ShoutRequest(Request):
+    def __init__(self,client,name):
+        super(UserRequest,self).__init__(client)
+        self._name=name
 
-    class GetShoutsHandler(Request.Handler):
-        def process(self,ret):
-            return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
-
-    def __init__(self,*args,**kwargs):
-        super(ShoutRequest,self).__init__(*args,**kwargs)
+    def __repr__(self):
+        return 'UserRequest(%r,%r)' % (self._client,self._name)
 
     def shout(self,message):
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"message":message,"sk":self.mobileSession})
-        ret=self._call_POST(self.remoteShoutMethod,True)
-        return StatusHandler().process(ret)
-    
+        ret=self._client.call_POST(user=self._name,method="user.shout",message=message)
+        return statusHandler(ret)
+
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
             raise errors.Error("wrong limit supplied")
         if page:
             if page > limit:
                 raise errors.Error("wrong page supplied")
-            self._paramsMap["page"]=page
 
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"autocorrect":str(autocorrect),"limit":str(limit)})
-        ret=self._call_GET(self.remoteGetShoutsMethod,False)
-        return ShoutRequest.GetShoutsHandler().process(ret)
+        ret=self._client.call_GET(method="user.getShouts",user=self._name,autocorrect=autocorrect,limit=limit,page=page)
+        return getShoutsHandler(ret)
 
-class TagsRequest(Request):
-
-    class GetTagsHandler(Request.Handler):
-        def process(self,ret):
-            return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
-        
-    def __init__(self,*args,**kwargs):
-        super(TagsRequest,self).__init__(*args,**kwargs)
-
-    def addTags(self,tags):
-        if len(tags) > 10:
-            raise errors.Error("too many tags supplied. Max 10 tags")
-
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"tags":','.join(tags),"sk":self.mobileSession})
-        ret=self._call_POST(self.remoteAddTagsMethod,True)
-        return StatusHandler().process(ret)
-
-    def removeTag(self,tag):
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"tag":tag,"sk":self.mobileSession})
-        ret=self._call_POST(self.remoteRemoveTagMethod,True)
-        return StatusHandler().process(ret)
-        
-    def getTags(self,autocorrect=0):
-        if autocorrect not in (0,1):
-            raise errors.Error("wrong autocorect supplied")
-
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"autocorrect":str(autocorrect),"sk":self.mobileSession})
-        ret=self._call_POST(self.remoteGetTagsMethod,True)
-        return TagsRequest.GetTagsHandler().process(ret)
-
-class ShareRequest(Request):
-
-    def __init__(self,*args,**kwargs):
-        super(ShareRequest,self).__init__(*args,**kwargs)
-    
-    def share(self,recipients,message=None,public=0):
-        if len(recipients) < 0 or len(recipients) > 10:
-            raise errors.Error("wrong recipients count supplied")
-
-        for user in recipients:
-            if "@" in user and not ArtistRequest.re_email.match(user):
-                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
-
-        if public not in (0,1):
-            raise errors.Error("wrong public supplied")
-
-        self._paramsMap=self._getParams()
-        if message:
-            self._paramsMap["message"]=message
-
-        self._paramsMap.update({"recipient":",".join(recipients),"public":str(public),"sk":self.mobileSession})
-        ret=self._call_POST(self.remoteShareMethod,True)
-        return StatusHandler().process(ret) 
-
-class SimilarRequest(Request):
-
-    class GetSimilarHandler(Request.Handler):
-        def process(self,ret):
-            return [ArtistRequest(xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
-
-    def __init__(self,*args,**kwargs):
-        super(SimilarRequest,self).__init__(*args,**kwargs)
-
-    def getSimilar(self,limit=50,autocorrect=0):
-        if limit < 0:
-            raise errors.Error("wrong limit supplied")
-
-        if autocorrect not in (0,1):
-            raise errors.Error("wrong autocorrect supplied")
-
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"autocorrect":str(autocorrect),"limit":str(limit)})
-        ret=self._call_GET(self.remoteGetSimilarMethod,False)
-        return SimilarRequest.GetSimilarHandler().process(ret)
-
-class AuthRequest(Request):
-    def __init__(self):
-        super(AuthRequest,self).__init__()
-        self._authToken=None
-
-    def __repr__(self):
-        return 'AuthRequest()'
-
-    def getToken(self):
-        self._paramsMap=self._getParams()
-        ret = self._call_GET("auth.getToken",True)
-        return xmlutils.extract_elem(ret,"token").text
-
-    def _create_authToken(self):
-        if self._authToken is None:
-            m = hashlib.new('md5')
-            m.update(auth.authData.userpass)
-            value = auth.authData.username.lower() + m.hexdigest()
-            m = hashlib.new('md5')
-            m.update(value)
-            self._authToken = m.hexdigest()
-        return self._authToken
-
-    @property
-    def mobileSession(self):
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"username":auth.authData.username, "authToken":self._create_authToken()})
-        ret = self._call_GET("auth.getMobileSession",True)
-        elem=xmlutils.extract_elem(ret,"session/key")
-        if elem is None:
-            raise errors.BadResponseError()
-        else:
-            return elem.text
-
-class UserRequest(ShoutRequest):
-    remoteShoutMethod="user.shout"
-    remoteGetShoutsMethod="user.getShouts"
-
-    def __init__(self,name):
-        super(UserRequest,self).__init__()
-        self._name=name
-
-    def __repr__(self):
-        return 'UserRequest(%r)' % (self._name,)
-
-    def _getParams(self):
-        params={"user":self._name}
-        params.update(super(UserRequest,self)._getParams())
-        return params
-
-class ArtistRequest(ShoutRequest,TagsRequest,ShareRequest,SimilarRequest):
-
-    remoteShoutMethod="artist.shout"
-    remoteGetShoutsMethod="artist.getShouts"
-    remoteAddTagsMethod="artist.addTags"
-    remoteRemoveTagMethod="artist.removeTag"
-    remoteGetTagsMethod="artist.getTags"
-    remoteShareMethod="artist.share"
-    remoteGetSimilarMethod="artist.getSimilar"
+class ArtistRequest(Request):
 
     re_email=re.compile(r"(?:^|\s)[-a-z0-9_.]+@(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)",re.IGNORECASE)
 
-    def __init__(self,name):
-        super(ArtistRequest,self).__init__()
+    def __init__(self,client,name):
+        super(ArtistRequest,self).__init__(client)
         self._name=name
 
     def __repr__(self):
-        return 'ArtistRequest(%r)' % (self._name,)
+        return 'ArtistRequest(%r,%r)' % (self._client,self._name)
 
     def getName(self):
         return self._name
 
-    def _getParams(self):
-        p=super(ArtistRequest,self)._getParams()
-        params={"artist":self._name}
-        params.update(p)
-        return params
-
     def getCorrection(self):
-        self._paramsMap=self._getParams()
-        ret=self._call_GET("artist.getCorrection",False)
+        ret=self._client.call_GET(addSign=False,method="artist.getCorrection",artist=self._name)
         return [i.text for i in xmlutils.extract_elems(ret,".//correction/artist/name")]
 
     def search(self,limit=30,page=1):
@@ -315,41 +208,90 @@ class ArtistRequest(ShoutRequest,TagsRequest,ShareRequest,SimilarRequest):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"limit":str(limit),"page":str(page)})
-        ret=self._call_GET("artist.search",False)
-        return [ArtistRequest(xmlutils.extract_subelem(artist,"name").text) for artist in
+        ret=self._client.call_GET(addSign=False,method="artist.search",artist=self._name,limit=limit,page=page)
+        return [ArtistRequest(client=self._client,name=xmlutils.extract_subelem(artist,"name").text) for artist in
             xmlutils.extract_elems(ret,".//artistmatches/artist")]
 
     def getEvents(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
-        self._paramsMap=self._getParams()
-        self._paramsMap.update({"autocorrect":str(autocorrect)})
-        ret=self._call_GET("artist.getEvents",False)
-        return [EventRequest(id.text) for id in
+
+        ret=self._client.call_GET(addSign=False,method="artist.getEvents",artist=self._name,autocorrect=autocorrect)
+        return [EventRequest(client=self._client, id=id.text) for id in
                 xmlutils.extract_elems(ret,".//events/event/id")]
+
+    def shout(self,message):
+        ret=self._client.call_POST(artist=self._name,method="artist.shout",message=message)
+        return statusHandler(ret)
+
+    def getShouts(self,limit=50,autocorrect=0,page=None):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+        if page:
+            if page > limit:
+                raise errors.Error("wrong page supplied")
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getShouts",artist=self._name,autocorrect=autocorrect,limit=limit,page=page)
+        return getShoutsHandler(ret)
+
+    def addTags(self,tags):
+        if len(tags) > 10:
+            raise errors.Error("too many tags supplied. Max 10 tags")
+
+        ret=self._client.call_POST(method='artist.addTags',artist=self._name,tags=','.join(tags))
+        return statusHandler(ret)
+
+    def removeTag(self,tag):
+        ret=self._client.call_POST(method='artist.removeTag',artist=self._name,tag=tag)
+        return statusHandler(ret)
+
+    def getTags(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorect supplied")
+
+        ret=self._client.call_POST(method='artist.getTags',artist=self._name,autocorrect=autocorrect)
+        return getTagsHandler(ret)
+
+    def share(self,recipients,message=None,public=0):
+        if len(recipients) < 0 or len(recipients) > 10:
+            raise errors.Error("wrong recipients count supplied")
+
+        for user in recipients:
+            if "@" in user and not Request.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
+
+        if public not in (0,1):
+            raise errors.Error("wrong public supplied")
+
+        ret=self._client.call_POST(artist=self._name,method="artist.share",message=message,public=public,recipient=','.join(recipients))
+        return statusHandler(ret)
+
+    def getSimilar(self,limit=50,autocorrect=0):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(addSign=False,method="artist.getSimilar",artist=self._name,limit=limit,autocorrect=autocorrect)
+        return [ArtistRequest(client=self._client,name=xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
 
 class VenueRequest(Request):
 
-    def __init__(self,id,name):
-        super(VenueRequest,self).__init__()
+    def __init__(self,client,id,name):
+        super(VenueRequest,self).__init__(client)
         self._id = id
         self._name=name
 
     def __repr__(self):
-        return "VenueRequest(%r,%r)" % (self._name,self._id)
-
-    def _getParams(self):
-        params={"venue":self._id}
-        params.update(super(VenueRequest,self)._getParams())
-        return params
+        return "VenueRequest(%r,%r,%r)" % (self._client,self._name,self._id)
 
     def getEvents(self):
-        self._paramsMap=self._getParams()
-        res=self._call_GET("venue.getEvents",False)
-        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for
-                event in xmlutils.extract_elems(res,".//events/event")]
+        res=self._client.call_GET(addSign=False,method="venue.getEvents",venue=self._id)
+        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in xmlutils.extract_elems(res,".//events/event")]
 
     def getPastEvents(self,page=1,limit=50):
         if limit < 0:
@@ -358,13 +300,9 @@ class VenueRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        self._paramsMap=self._getParams()
-        self._paramsMap["limit"]=str(limit)
-        self._paramsMap["page"]=str(page)
+        res=self._client.call_GET(addSign=False,method="venue.getPastEvents",venue=self._id,page=page,limit=limit)
 
-        res=self._call_GET("venue.getPastEvents",False)
-
-        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for
+        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for
                 event in xmlutils.extract_elems(res,".//events/event")]
 
     def search(self,page=1,limit=50):
@@ -374,30 +312,17 @@ class VenueRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        self._paramsMap=self._getParams()
-        self._paramsMap["venue"]=self._name #a must
-        self._paramsMap["limit"]=str(limit)
-        self._paramsMap["page"]=str(page)
+        res=self._client.call_GET(addSign=False,method="venue.search",venue=self._name,limit=limit,page=page)
+        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in  xmlutils.extract_elems(res,".//results/venuematches/venue")]
 
-        res=self._call_GET("venue.search",False)
+class EventRequest(Request):
 
-        return [EventRequest(xmlutils.extract_subelem(event,"id").text) for event in  xmlutils.extract_elems(res,".//results/venuematches/venue")]
-
-class EventRequest(ShareRequest):
-
-    remoteShareMethod="event.share"
-
-    def __init__(self,id):
-        super(EventRequest,self).__init__()
+    def __init__(self,client,id):
+        super(EventRequest,self).__init__(client)
         self._id=id
 
     def __repr__(self):
-        return "EventRequest(%r)" % (self._id)
-
-    def _getParams(self):
-        params={"event":str(self._id)}
-        params.update(super(EventRequest,self)._getParams())
-        return params
+        return "EventRequest(%r,%r)" % (self._client,self._id)
 
     def getID(self):
         return self._id
@@ -406,7 +331,7 @@ class EventRequest(ShareRequest):
         return xmlutils.extract_elem(self._getInfo(),".//event/title").text
 
     def getArtists(self):
-        return [ArtistRequest(artist.text) for artist in
+        return [ArtistRequest(client=self._client, name=artist.text) for artist in
                 xmlutils.extract_elems(self._getInfo(),".//event/artists/artist")]
 
     def getAttendance(self):
@@ -426,12 +351,11 @@ class EventRequest(ShareRequest):
         return res if res else ""
 
     def getImages(self):
-        return [image.text for image in  xmlutils.extract_elems(self._getInfo(),".//event/image")]
+        return [image.text for image in xmlutils.extract_elems(self._getInfo(),".//event/image")]
 
     def getVenue(self):
         res = xmlutils.extract_elem(self._getInfo(),".//event/venue")
-        return VenueRequest(xmlutils.extract_subelem(res,"id").text,
-                xmlutils.extract_subelem(res,"name").text)
+        return VenueRequest(client=self._client,id=xmlutils.extract_subelem(res,"id").text, name=xmlutils.extract_subelem(res,"name").text)
 
     def getTag(self):
         #TODO
@@ -445,63 +369,134 @@ class EventRequest(ShareRequest):
         pass
 
     def _getInfo(self):
-        self._paramsMap=self._getParams()
-        return self._call_GET("event.getInfo",False)
+        return self._client.call_GET(addSign=False,method="event.getInfo",event=self._id)
 
-class TrackRequest(ShoutRequest,TagsRequest,ShareRequest):
+    def share(self,recipients,message=None,public=0):
+        if len(recipients) < 0 or len(recipients) > 10:
+            raise errors.Error("wrong recipients count supplied")
 
-    remoteShoutMethod="track.Shout"
-    remoteGetShoutsMethod="track.getShouts"
-    remoteAddTagsMethod="track.addTags"
-    remoteRemoveTagMethod="track.removeTag"
-    remoteGetTagsMethod="track.getTags"
-    remoteShareMethod="track.share"
+        for user in recipients:
+            if "@" in user and not Request.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
 
-    def __init__(self,name,artist):
-        super(TrackRequest,self).__init__()
+        if public not in (0,1):
+            raise errors.Error("wrong public supplied")
+
+        ret=self._client.call_POST(event=self._id,method="event.share",message=message,public=public,recipient=','.join(recipients))
+        return statusHandler(ret)
+
+class TrackRequest(Request):
+
+    def __init__(self,client,name,artist):
+        super(TrackRequest,self).__init__(client)
         self._name=name
         self._artist=artist
 
-    def _getParams(self):
-        params={"track":self._name,"artist":self._artist}
-        params.update(super(TrackRequest,self)._getParams())
-        return params
-
-#TODO: don't leave it public.
-    def getInfo(self,autocorrect=0,username=None):
+    def _getInfo(self,autocorrect=0,username=None):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        self._paramsMap=self._getParams()
-        self._paramsMap['autocorrect']=str(autocorrect)
-        if username:
-            self._paramsMap['username']=username
-        res=self._call_GET("track.getInfo",False)
-        return res
+        return self._client.call_GET(method="track.getInfo",track=self._name,artist=self._artist,autocorrect=autocorrect,username=username)
 
     def __repr(self):
-        return 'TrackRequest(%r)' % (self._name,)
+        return 'TrackRequest(%r,%r,%r)' % (self._client,self._name,self._artist)
 
-class AlbumRequest(ShoutRequest,TagsRequest,ShareRequest):
+    def getShouts(self,limit=50,autocorrect=0,page=None):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+        if page:
+            if page > limit:
+                raise errors.Error("wrong page supplied")
 
-    remoteShoutMethod="album.shout"
-    remoteGetShoutsMethod="album.getShouts"
-    remoteAddTagsMethod="album.addTags"
-    remoteRemoveTagMethod="album.removeTag"
-    remoteGetTagsMethod="album.getTags"
-    remoteShareMethod="album.share"
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
 
-    def __init__(self,name,artist):
+        ret=self._client.call_GET(addSign=False,method="track.getShouts",track=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
+        return getShoutsHandler(ret)
+
+    def share(self,recipients,message=None,public=0):
+        if len(recipients) < 0 or len(recipients) > 10:
+            raise errors.Error("wrong recipients count supplied")
+
+        for user in recipients:
+            if "@" in user and not Request.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (recipient,))
+
+        if public not in (0,1):
+            raise errors.Error("wrong public supplied")
+
+        ret=self._client.call_POST(track=self._name,artist=self._artist,method="track.share",message=message,public=public,recipient=','.join(recipients))
+        return statusHandler(ret)
+
+    def addTags(self,tags):
+        if len(tags) > 10:
+            raise errors.Error("too many tags supplied. Max 10 tags")
+
+        ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist,tags=','.join(tags))
+        return statusHandler(ret)
+
+    def removeTag(self,tag):
+        ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist,tag=tag)
+        return statusHandler(ret)
+
+    def getTags(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorect supplied")
+
+        ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist,autocorrect=autocorrect)
+        return getTagsHandler(ret)
+
+class AlbumRequest(Request):
+
+    def __init__(self,client,name,artist):
+        super(AlbumRequest,self).__init__(client)
         self._name=name
         self._artist=artist
 
-    
     def __repr__(self):
-        return "AlbumRequest(%r,%r)" % (self._name,self._artist)
+        return "AlbumRequest(%r,%r,%r)" % (self._client,self._name,self._artist)
 
-    def _getParams(self):
-        params={"album":self._name,"artist":self._artist}
-        params.update(super(AlbumRequest,self)._getParams())
-        return params
+    def addTags(self,tags):
+        if len(tags) > 10:
+            raise errors.Error("too many tags supplied. Max 10 tags")
 
-_authRequest=None
+        ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist,tags=','.join(tags))
+        return statusHandler(ret)
+
+    def removeTag(self,tag):
+        ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist,tag=tag)
+        return statusHandler(ret)
+
+    def getTags(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorect supplied")
+
+        ret=self._client.call_POST(method='album.getTags',album=self._name,artist=self._artist,autocorrect=autocorrect)
+        return getTagsHandler(ret)
+
+    def share(self,recipients,message=None,public=0):
+        if len(recipients) < 0 or len(recipients) > 10:
+            raise errors.Error("wrong recipients count supplied")
+
+        for user in recipients:
+            if "@" in user and not Request.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (recipient,))
+
+        if public not in (0,1):
+            raise errors.Error("wrong public supplied")
+
+        ret=self._client.call_POST(album=self._name,artist=self._artist,method="album.share",message=message,public=public,recipient=','.join(recipients))
+        return statusHandler(ret)
+
+    def getShouts(self,limit=50,autocorrect=0,page=None):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+        if page:
+            if page > limit:
+                raise errors.Error("wrong page supplied")
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(addSign=False,method="album.getShouts",album=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
+        return getShoutsHandler(ret)

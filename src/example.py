@@ -1,22 +1,22 @@
 import impl.requests as requests
 import impl.errors as errors
-import impl.auth  as auth
 
 if __name__=="__main__":
 
     #setup required data
-    auth.URL="ws.audioscrobbler.com"
+    URL="ws.audioscrobbler.com"
+
     api_key=raw_input("Please enter your api_key: ")
-    secret=raw_input("Please enter your secret: ")
+    api_secret=raw_input("Please enter your secret: ")
     username=raw_input("Please enter your username: ")
     userpass=raw_input("Please enter your userpass: ")
 
-    auth.newAuthData(api_key,secret,username,userpass)
-
     #do smth interesting!
     try:
+        client=requests.Client(URL,api_key,api_secret,username,userpass)
+
         print "event APIs"
-        event=requests.EventRequest(1073657)
+        event=requests.EventRequest(client,1073657)
         print "event.share: ", event.share(["varnie"],"this event is shared with you!") 
         print "event.getArtists: ", event.getArtists()
         print "event.getDescription: ",event.getDescription()
@@ -36,7 +36,7 @@ if __name__=="__main__":
         print "venue.search: ",  venue.search(1,1)
 
         print "artist APIs"
-        artist=requests.ArtistRequest("Sepultura")
+        artist=requests.ArtistRequest(client,"Sepultura")
         print "artist.getCorrection: ",artist.getCorrection()
         tags=["metal","black","death","ZZZ"]
         print "artist.addTags: ", artist.addTags(tags)
@@ -52,11 +52,8 @@ if __name__=="__main__":
         print "artist.search: ", artist.search()
         print "artist.getEvents: ",artist.getEvents()
 
-        print "user APIs"
-        print "user.shout: ", requests.UserRequest("user_name").shout("this is a test message")
-
         print "track APIs"
-        track=requests.TrackRequest("LAM","Behemoth")
+        track=requests.TrackRequest(client,"LAM","Behemoth")
         print "track.share: ", track.share(["varnie"],"tetwoo! this track is shared with you") 
         print "track.addTags: ", track.addTags(tags)
         print "track.getTags: ", track.getTags()
@@ -64,16 +61,15 @@ if __name__=="__main__":
         for tag in tags:
             print track.removeTag(tag),
         print ""
-#        print "track.shout: ", track.shout("woho! nice to see this band!")
         print "track.getShouts: ", track.getShouts(2)
-        print "track.getInfo: ", track.getInfo()
+
         print "user APIs"
-        user=requests.UserRequest("user_name")
+        user=requests.UserRequest(client,"varnie")
         print "user.shout: ", user.shout("this is a test message")
         print "user.getShouts: ",user.getShouts(2) 
-        
+
         print "album APIs"
-        album=requests.AlbumRequest("Demigod","Behemoth")
+        album=requests.AlbumRequest(client,"Demigod","Behemoth")
         print "album.share: ", album.share(["varnie"],"album share")
         print "album.addTags: ", album.addTags(tags)
         print "album.getTags: ", album.getTags()
@@ -82,6 +78,11 @@ if __name__=="__main__":
             print album.removeTag(tag),
         print ""
         print "album.getShouts: ",album.getShouts(2)
-        #print "album.shout: ",album.shout("hello")
+
+        print "user APIs"
+        user=requests.UserRequest(client=client,name='varnie')
+        print "user.shout: ", user.shout("this is a test message")
+        print "user.getShouts: ", user.getShouts()
+
     except errors.Error, e:
        print e
