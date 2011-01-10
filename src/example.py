@@ -94,6 +94,7 @@ if __name__=="__main__":
         print "album.getPlayCount: ", album.getPlayCount()
         print "album.getImagesURLs: ", album.getImagesURLs()
         print "album.getTopTags: ", album.getTopTags()
+        print "album.getBuylinks: ", album.getBuylinks()
 
         print "user APIs"
         user=requests.UserRequest(client=client,name='varnie')

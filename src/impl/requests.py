@@ -639,3 +639,22 @@ class AlbumRequest(Request):
 
         ret=self._client.call_GET(addSign=False,method="album.search",album=self._name,limit=limit,page=page)
         return [AlbumRequest(client=self._client,name=xmlutils.extract_subelem(album,"name").text) for album in xmlutils.extract_elems(ret,".//albummatches/album")]
+
+    def getBuylinks(self,autocorrect=0,country='united kingdom'):
+        """contry: A country name, as defined by the ISO 3166-1 country names standard."""
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="album.getBuylinks",country=country,album=self._name,artist=self._artist,autocorrect=autocorrect)
+
+        result=[]
+        for affiliation in xmlutils.extract_elems(ret,".//affiliations/physicals/affiliation"):
+                buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
+                result.append(buyLink)
+
+        for affiliation in xmlutils.extract_elems(ret,".//affiliations/downloads/affiliation"):
+                buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
+                result.append(buyLink)
+
+        return result
