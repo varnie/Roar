@@ -15,17 +15,17 @@ def extract_subelem(ownerElem, elemName):
 class XMLParser(object):
 
     def __init__(self,XMLbody):
-	super(XMLParser,self).__init__()
-	self._XMLbody=XMLbody
-	self._xmlTree=self._createXMLTree()
+        super(XMLParser,self).__init__()
+        self._XMLbody=XMLbody
+        self._createXMLTree()
 
     def __repr__(self):
-	return 'XMLParser(%r)' % (self._XMLbody,)
+        return 'XMLParser(%r)' % (self._XMLbody,)
 
     def _createXMLTree(self):
         parser=xml.XMLTreeBuilder()
         parser.feed(self._XMLbody)
-        return xml.ElementTree(parser.close())
+        self._xmlTree=xml.ElementTree(parser.close())
 
     def extract_elems(self, elemName):
         return self._xmlTree.findall(elemName)

@@ -27,6 +27,8 @@ if __name__=="__main__":
         print "event.getStartDate: ",event.getStartDate()
         print "event.getImages: ",event.getImages()
         print "event.getWebsite: ",event.getWebsite()
+        print "event.getAttendees: ", event.getAttendees()
+        print "event.attend: ", event.attend(0)
 
         print "venue APIs"
         venue=event.getVenue()
@@ -51,6 +53,12 @@ if __name__=="__main__":
         print "artist.shout: ",artist.shout("Horns up\m/")
         print "artist.search: ", artist.search()
         print "artist.getEvents: ",artist.getEvents()
+        print "artist.getImagesURLs: ", artist.getImagesURLs()
+        print "artist.getTopAlbums: ", artist.getTopAlbums()
+        print "artist.getTopFans: ", artist.getTopFans()
+        print "artist.getTopTags: ", artist.getTopTags()
+        print "artist.getTopTracks: ", artist.getTopTracks()
+        print "artist.getPastEvents: ", artist.getPastEvents()
 
         print "track APIs"
         track=requests.TrackRequest(client,"LAM","Behemoth")
@@ -78,6 +86,14 @@ if __name__=="__main__":
             print album.removeTag(tag),
         print ""
         print "album.getShouts: ",album.getShouts(2)
+        print "album.getName: ", album.getName()
+        print "album.getID: ", album.getID()
+        print "album.getURL: ", album.getURL()
+        print "album.getReleaseDate: ", album.getReleaseDate()
+        print "album.getListeners: ", album.getListeners()
+        print "album.getPlayCount: ", album.getPlayCount()
+        print "album.getImagesURLs: ", album.getImagesURLs()
+        print "album.getTopTags: ", album.getTopTags()
 
         print "user APIs"
         user=requests.UserRequest(client=client,name='varnie')

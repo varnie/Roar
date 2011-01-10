@@ -9,6 +9,7 @@ import re
 from collections import namedtuple
 
 TagType = namedtuple("Tag","name,url")
+ImageType = namedtuple("Image","title,url,dateadded,format,owner,sizes,thumbsup,thumbsdown")
 
 def url_fix(s, charset='utf-8'):
     if isinstance(s, unicode):
@@ -19,17 +20,14 @@ def url_fix(s, charset='utf-8'):
     qs = urllib.quote_plus(qs, ':&=')
     return urlparse.urlunsplit((scheme, netloc, path, qs, anchor))
 
-def statusHandler(ret):
+def _statusHandler(ret):
     return xmlutils.extract_elem(ret,"status",True)
 
-def getShoutsHandler(ret):
+def _getShoutsHandler(ret):
     return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
 
-def getTagsHandler(ret):
+def _getTagsHandler(ret):
     return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
-
-def getSimilarArtistHandler(ret):
-    return [ArtistRequest(xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
 
 class Request(object):
 
@@ -49,8 +47,8 @@ class Client(object):
         self._authToken=None
         self._sk=None
 
-    def __repr(self):
-        return 'Client(%r,%r,%r,%r,%r)' % (self._URL,self._api_key,self._api_secret,self._username,self._password)
+    def __str__(self):
+        return 'Client'
 
     def getToken(self):
         ret = self.call_GET(addSign=True,method="auth.getToken")
@@ -115,10 +113,9 @@ class Client(object):
         return resp_string
 
     def call_POST(self,**paramsMap):
-        paramsMap['sk']=self.mobileSession
-        paramsMap['api_key']=self._api_key
+        paramsMap.update({'sk':self.mobileSession, 'api_key':self._api_key})
         self._fix_params(paramsMap)
-        paramsMap.update({'api_sig':self._get_sign(paramsMap)})
+        paramsMap.update({'api_sig':self._get_sign(paramsMap)}) #api_sig must be calculated after all params have been supplied
 
         params=urllib.urlencode(paramsMap)
         url=url_fix("http://%s/2.0/" % (self._URL,))
@@ -168,7 +165,7 @@ class UserRequest(Request):
 
     def shout(self,message):
         ret=self._client.call_POST(user=self._name,method="user.shout",message=message)
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
@@ -181,7 +178,7 @@ class UserRequest(Request):
             raise errors.Error("wrong autocorrect supplied")
 
         ret=self._client.call_GET(method="user.getShouts",user=self._name,autocorrect=autocorrect,limit=limit,page=page)
-        return getShoutsHandler(ret)
+        return _getShoutsHandler(ret)
 
 class ArtistRequest(Request):
 
@@ -200,6 +197,69 @@ class ArtistRequest(Request):
     def getCorrection(self):
         ret=self._client.call_GET(addSign=False,method="artist.getCorrection",artist=self._name)
         return [i.text for i in xmlutils.extract_elems(ret,".//correction/artist/name")]
+
+    def getPastEvents(self,autocorrect=0,limit=50,page=1):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+        
+        res=self._client.call_GET(method="artist.getPastEvents",artist=self._name,page=page,autocorrect=autocorrect,limit=limit)
+        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in xmlutils.extract_elems(res,".//events/event")]
+
+    def getPodcast(self):
+#TODO
+        pass
+
+    def getTopAlbums(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getTopAlbums",autocorrect=autocorrect,artist=self._name)
+        result=[]
+        for album in xmlutils.extract_elems(ret,".//topalbums/album"):
+            name=xmlutils.extract_subelem(album,".//name").text
+            result.append(AlbumRequest(client=self._client,name=name,artist=self._name))
+
+        return result
+
+    def getTopFans(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getTopFans",autocorrect=autocorrect,artist=self._name)
+        result=[]
+        for user in xmlutils.extract_elems(ret,".//topfans/user"):
+            name=xmlutils.extract_subelem(user,".//name").text
+            result.append(UserRequest(client=self._client,name=name))
+
+        return result
+
+    def getTopTags(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getTopTags",autocorrect=autocorrect,artist=self._name)
+        result=[]
+        for tag in xmlutils.extract_elems(ret,".//toptags/tag"):
+            name=xmlutils.extract_subelem(tag,".//name").text
+            url=xmlutils.extract_subelem(tag,".//url").text
+            result.append(TagType(name,url))
+
+        return result
+
+    def getTopTracks(self,autocorrect=0):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getTopTracks",autocorrect=autocorrect,artist=self._name)
+        result=[]
+        for track in xmlutils.extract_elems(ret,".//toptracks/track"):
+            name=xmlutils.extract_subelem(track,".//name").text
+            result.append(TrackRequest(client=self._client,name=name,artist=self._name))
+
+        return result
 
     def search(self,limit=30,page=1):
         if limit < 0:
@@ -222,7 +282,7 @@ class ArtistRequest(Request):
 
     def shout(self,message):
         ret=self._client.call_POST(artist=self._name,method="artist.shout",message=message)
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
@@ -235,25 +295,25 @@ class ArtistRequest(Request):
             raise errors.Error("wrong autocorrect supplied")
 
         ret=self._client.call_GET(method="artist.getShouts",artist=self._name,autocorrect=autocorrect,limit=limit,page=page)
-        return getShoutsHandler(ret)
+        return _getShoutsHandler(ret)
 
     def addTags(self,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
         ret=self._client.call_POST(method='artist.addTags',artist=self._name,tags=','.join(tags))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def removeTag(self,tag):
         ret=self._client.call_POST(method='artist.removeTag',artist=self._name,tag=tag)
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='artist.getTags',artist=self._name,autocorrect=autocorrect)
-        return getTagsHandler(ret)
+        return _getTagsHandler(ret)
 
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
@@ -267,7 +327,7 @@ class ArtistRequest(Request):
             raise errors.Error("wrong public supplied")
 
         ret=self._client.call_POST(artist=self._name,method="artist.share",message=message,public=public,recipient=','.join(recipients))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getSimilar(self,limit=50,autocorrect=0):
         if limit < 0:
@@ -278,6 +338,35 @@ class ArtistRequest(Request):
 
         ret=self._client.call_GET(addSign=False,method="artist.getSimilar",artist=self._name,limit=limit,autocorrect=autocorrect)
         return [ArtistRequest(client=self._client,name=xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
+
+    def getImages(self,limit=50,autocorrect=0,page=None):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+        if page:
+            if page > limit:
+                raise errors.Error("wrong page supplied")
+
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        ret=self._client.call_GET(method="artist.getImages",artist=self._name,autocorrect=autocorrect,limit=limit,page=page)
+
+        result=[]
+        for image in xmlutils.extract_elems(ret,".//images/image"):
+
+            title=xmlutils.extract_subelem(image,"title").text
+            title = title if title else ""
+            url=xmlutils.extract_subelem(image,"url").text
+            dateadded=xmlutils.extract_subelem(image,".//dateadded").text
+            format=xmlutils.extract_subelem(image,".//format").text
+            owner=UserRequest(client=self._client,name=xmlutils.extract_subelem(image,"owner"))
+            sizes=[size.text for size in xmlutils.extract_subelems(image,".//sizes/size")]
+            thumbsup=xmlutils.extract_subelem(image,".//votes/thumbsup").text
+            thumbsdown=xmlutils.extract_subelem(image,".//votes/thumbsdown").text
+
+            result.append(ImageType(title,url,dateadded,format,owner,sizes,thumbsup,thumbsdown))
+
+        return result
 
 class VenueRequest(Request):
 
@@ -330,6 +419,23 @@ class EventRequest(Request):
     def getTitle(self):
         return xmlutils.extract_elem(self._getInfo(),".//event/title").text
 
+    def getAttendees(self):
+        ret=self._client.call_GET(method="event.getAttendees",event=self._id)
+
+        result=[]
+        for user in xmlutils.extract_elems(ret,".//attendees/user"):
+            name=xmlutils.extract_subelem(user,".//name").text
+            result.append(UserRequest(client=self._client,name=name))
+
+        return result
+
+    def attend(self,status):
+        if status not in (0,1,2):
+            raise errors.Error("wrong parameter supplied")
+
+        ret=self._client.call_POST(method="event.attend",event=self._id,status=status)
+        return _statusHandler(ret)
+
     def getArtists(self):
         return [ArtistRequest(client=self._client, name=artist.text) for artist in
                 xmlutils.extract_elems(self._getInfo(),".//event/artists/artist")]
@@ -350,23 +456,15 @@ class EventRequest(Request):
         res=xmlutils.extract_elem(self._getInfo(),".//event/description").text
         return res if res else ""
 
-    def getImages(self):
+    def getImagesURLs(self):
         return [image.text for image in xmlutils.extract_elems(self._getInfo(),".//event/image")]
 
     def getVenue(self):
         res = xmlutils.extract_elem(self._getInfo(),".//event/venue")
         return VenueRequest(client=self._client,id=xmlutils.extract_subelem(res,"id").text, name=xmlutils.extract_subelem(res,"name").text)
 
-    def getTag(self):
-        #TODO
-        pass
-
     def getWebsite(self):
         return xmlutils.extract_elem(self._getInfo(),".//event/website").text
-
-    def getTickets(self):
-        #TODO
-        pass
 
     def _getInfo(self):
         return self._client.call_GET(addSign=False,method="event.getInfo",event=self._id)
@@ -383,7 +481,7 @@ class EventRequest(Request):
             raise errors.Error("wrong public supplied")
 
         ret=self._client.call_POST(event=self._id,method="event.share",message=message,public=public,recipient=','.join(recipients))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
 class TrackRequest(Request):
 
@@ -412,7 +510,7 @@ class TrackRequest(Request):
             raise errors.Error("wrong autocorrect supplied")
 
         ret=self._client.call_GET(addSign=False,method="track.getShouts",track=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
-        return getShoutsHandler(ret)
+        return _getShoutsHandler(ret)
 
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
@@ -426,25 +524,25 @@ class TrackRequest(Request):
             raise errors.Error("wrong public supplied")
 
         ret=self._client.call_POST(track=self._name,artist=self._artist,method="track.share",message=message,public=public,recipient=','.join(recipients))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def addTags(self,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
         ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist,tags=','.join(tags))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def removeTag(self,tag):
         ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist,tag=tag)
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist,autocorrect=autocorrect)
-        return getTagsHandler(ret)
+        return _getTagsHandler(ret)
 
 class AlbumRequest(Request):
 
@@ -456,23 +554,54 @@ class AlbumRequest(Request):
     def __repr__(self):
         return "AlbumRequest(%r,%r,%r)" % (self._client,self._name,self._artist)
 
+    def _getInfo(self,autocorrect=0,username=None):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        return self._client.call_GET(method="album.getInfo",album=self._name,artist=self._artist,autocorrect=autocorrect,username=username)
+
+    def getName(self):
+        return self._name
+
+    def getID(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/id").text
+
+    def getURL(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/url").text
+
+    def getReleaseDate(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/releasedate").text
+
+    def getListeners(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/listeners")
+
+    def getPlayCount(self,username=None):
+        return xmlutils.extract_elem(self._getInfo(username=username), ".//album/playcount").text
+
+    def getImagesURLs(self):
+        return [image.text for image in xmlutils.extract_elems(self._getInfo(),".//album/image")]
+
+    def getTopTags(self):
+        ret = self._getInfo()
+        return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//toptags/tag")]
+
     def addTags(self,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
         ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist,tags=','.join(tags))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def removeTag(self,tag):
         ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist,tag=tag)
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='album.getTags',album=self._name,artist=self._artist,autocorrect=autocorrect)
-        return getTagsHandler(ret)
+        return _getTagsHandler(ret)
 
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
@@ -486,7 +615,7 @@ class AlbumRequest(Request):
             raise errors.Error("wrong public supplied")
 
         ret=self._client.call_POST(album=self._name,artist=self._artist,method="album.share",message=message,public=public,recipient=','.join(recipients))
-        return statusHandler(ret)
+        return _statusHandler(ret)
 
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
@@ -499,4 +628,14 @@ class AlbumRequest(Request):
             raise errors.Error("wrong autocorrect supplied")
 
         ret=self._client.call_GET(addSign=False,method="album.getShouts",album=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
-        return getShoutsHandler(ret)
+        return _getShoutsHandler(ret)
+
+    def search(self,limit=30,page=1):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+
+        ret=self._client.call_GET(addSign=False,method="album.search",album=self._name,limit=limit,page=page)
+        return [AlbumRequest(client=self._client,name=xmlutils.extract_subelem(album,"name").text) for album in xmlutils.extract_elems(ret,".//albummatches/album")]
