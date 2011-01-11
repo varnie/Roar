@@ -367,6 +367,28 @@ class ArtistRequest(Request):
 
         return result
 
+    def _getInfo(self,lang='en',autocorrect=0,username=None):
+        if autocorrect not in (0,1):
+            raise errors.Error("wrong autocorrect supplied")
+
+        return self._client.call_GET(method="artist.getInfo",artist=self._name,lang=lang,autocorrect=autocorrect,username=username)
+
+    def isStreamable(self):
+        ret=self._getInfo()
+        return xmlutils.extract_elem(ret,".//artist/streamable").text == "1"
+
+    def getListeners(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//artist/stats/listeners").text
+
+    def getPlayCount(self,username=None):
+        return xmlutils.extract_elem(self._getInfo(username=None), ".//artist/stats/playcount").text
+
+    def getBioSummary(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//artist/bio/summary").text
+
+    def getBioContent(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//artist/bio/content").text
+
 class VenueRequest(Request):
 
     def __init__(self,client,id,name):
@@ -559,6 +581,7 @@ class TrackRequest(Request):
         return  xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/listeners").text
 
     def getPlaycount(self,autocorrect=0,username=None):
+
         return xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/playcount").text
 
     def getToptags(self,autocorrect=0,username=None):
@@ -590,11 +613,11 @@ class AlbumRequest(Request):
     def __repr__(self):
         return "AlbumRequest(%r,%r,%r)" % (self._client,self._name,self._artist)
 
-    def _getInfo(self,autocorrect=0,username=None):
+    def _getInfo(self,autocorrect=0,username=None,lang='en'):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        return self._client.call_GET(method="album.getInfo",album=self._name,artist=self._artist,autocorrect=autocorrect,username=username)
+        return self._client.call_GET(method="album.getInfo",album=self._name,artist=self._artist,autocorrect=autocorrect,username=username,lang=lang)
 
     def getName(self):
         return self._name
@@ -609,13 +632,19 @@ class AlbumRequest(Request):
         return xmlutils.extract_elem(self._getInfo(), ".//album/releasedate").text
 
     def getListeners(self):
-        return xmlutils.extract_elem(self._getInfo(), ".//album/listeners")
+        return xmlutils.extract_elem(self._getInfo(), ".//album/listeners").text 
 
     def getPlayCount(self,username=None):
         return xmlutils.extract_elem(self._getInfo(username=username), ".//album/playcount").text
 
     def getImagesURLs(self):
         return [image.text for image in xmlutils.extract_elems(self._getInfo(),".//album/image")]
+
+    def getWikiSummary(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/wiki/summary").text
+
+    def getWikiContent(self):
+        return xmlutils.extract_elem(self._getInfo(), ".//album/wiki/content").text
 
     def getTopTags(self):
         ret = self._getInfo()

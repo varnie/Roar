@@ -59,6 +59,11 @@ if __name__=="__main__":
         print "artist.getTopTags: ", artist.getTopTags()
         print "artist.getTopTracks: ", artist.getTopTracks()
         print "artist.getPastEvents: ", artist.getPastEvents()
+        print "artist.isStreamable: ", artist.isStreamable()
+        print "artist.getListeners: ", artist.getListeners()
+        print "artist.getPlayCount: ", artist.getPlayCount()
+        print "artist.getBioSummary: ", artist.getBioSummary()
+        print "artist.getBioContent: ", artist.getBioContent()
 
         print "track APIs"
         track=requests.TrackRequest(client,"LAM","Behemoth")
@@ -104,6 +109,9 @@ if __name__=="__main__":
         print "album.getImagesURLs: ", album.getImagesURLs()
         print "album.getTopTags: ", album.getTopTags()
         print "album.getBuylinks: ", album.getBuylinks()
+        print "album.getPlayCount: ", album.getPlayCount()
+        print "album.getWikiSummary: ", album.getWikiSummary()
+        print "album.getWikiContent: ", album.getWikiContent()
 
         print "user APIs"
         user=requests.UserRequest(client=client,name='varnie')
