@@ -70,6 +70,15 @@ if __name__=="__main__":
             print track.removeTag(tag),
         print ""
         print "track.getShouts: ", track.getShouts(2)
+        print "track.getName: ", track.getName()
+        print "track.getUrl: ", track.getUrl()
+        print "track.getID: ", track.getID()
+        print "track.getDuration: ", track.getDuration()
+        print "track.getListeners: ", track.getListeners()
+        print "track.getPlaycount: ", track.getPlaycount()
+        print "track.getAlbum: ", track.getAlbum()
+        print "track.ban: ", track.ban()
+        print "track.unban: ", track.unban()
 
         print "user APIs"
         user=requests.UserRequest(client,"varnie")

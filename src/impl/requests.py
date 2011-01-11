@@ -78,13 +78,12 @@ class Client(object):
         return self._authToken
 
     def _fix_params(self,paramsMap):
-        try:
-            paramsMap.pop(None)
-        except KeyError,e:
-            pass
-
-        for k,v in paramsMap.iteritems():
-            paramsMap[k]=str(v)
+        for k in paramsMap.keys():
+            v = paramsMap[k]
+            if v is None:
+                paramsMap.pop(k)
+            else:
+                paramsMap[k]=str(v)
 
     def call_GET(self, addSign=False, **paramsMap):
         self._fix_params(paramsMap)
@@ -543,6 +542,43 @@ class TrackRequest(Request):
 
         ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist,autocorrect=autocorrect)
         return _getTagsHandler(ret)
+
+    def getName(self):
+        return self._name
+
+    def getUrl(self,autocorrect=0,username=None):
+        return xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/url").text
+
+    def getID(self,autocorrect=0,username=None):
+        return xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/id").text
+
+    def getDuration(self,autocorrect=0,username=None):
+        return xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/duration").text
+
+    def getListeners(self,autocorrect=0,username=None):
+        return  xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/listeners").text
+
+    def getPlaycount(self,autocorrect=0,username=None):
+        return xmlutils.extract_elem(self._getInfo(autocorrect,username),".//track/playcount").text
+
+    def getToptags(self,autocorrect=0,username=None):
+        #TODO
+        pass
+
+    def getAlbum(self):
+        #TODO
+        pass
+
+    def getArtist(self):
+        return self._artist
+
+    def ban(self):
+        ret=self._client.call_POST(method="track.ban",track=self._name,artist=self._artist)
+        return xmlutils.extract_elem(ret,"status",True)
+
+    def unban(self):
+        ret=self._client.call_POST(method="track.unban",track=self._name,artist=self._artist)
+        return xmlutils.extract_elem(ret,"status",True)
 
 class AlbumRequest(Request):
 
