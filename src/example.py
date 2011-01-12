@@ -17,7 +17,7 @@ if __name__=="__main__":
 
         print "event APIs"
         event=requests.EventRequest(client,1073657)
-        print "event.share: ", event.share(["varnie"],"this event is shared with you!") 
+        print "event.share: ", event.share(["varnie"],"this event is shared with you!")
         print "event.getArtists: ", event.getArtists()
         print "event.getDescription: ",event.getDescription()
         print "event.getAttendance: ",event.getAttendance()
@@ -74,6 +74,10 @@ if __name__=="__main__":
         for tag in tags:
             print track.removeTag(tag),
         print ""
+        print "track.getCorrection: ", track.getCorrection()
+        print "track.getSimilar: ", track.getSimilar()
+        print "track.getTopFans: ", track.getTopFans()
+        print "track.getTopTags: ", track.getTopTags()
         print "track.getShouts: ", track.getShouts(2)
         print "track.getName: ", track.getName()
         print "track.getUrl: ", track.getUrl()
@@ -84,11 +88,16 @@ if __name__=="__main__":
         print "track.getAlbum: ", track.getAlbum()
         print "track.ban: ", track.ban()
         print "track.unban: ", track.unban()
+        print "track.love: ", track.love()
+        print "track.unlove: ", track.unlove()
+        print "track.getArtist: ", track.getArtist()
+        print "track.getBuylinks: ", track.getBuylinks()
+        print "track.search: ", track.search()
 
         print "user APIs"
         user=requests.UserRequest(client,"varnie")
         print "user.shout: ", user.shout("this is a test message")
-        print "user.getShouts: ",user.getShouts(2) 
+        print "user.getShouts: ",user.getShouts(2)
 
         print "album APIs"
         album=requests.AlbumRequest(client,"Demigod","Behemoth")
@@ -104,6 +113,7 @@ if __name__=="__main__":
         print "album.getID: ", album.getID()
         print "album.getURL: ", album.getURL()
         print "album.getReleaseDate: ", album.getReleaseDate()
+        print "album.search: ", album.search()
         print "album.getListeners: ", album.getListeners()
         print "album.getPlayCount: ", album.getPlayCount()
         print "album.getImagesURLs: ", album.getImagesURLs()
