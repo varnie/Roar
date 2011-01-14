@@ -791,7 +791,7 @@ class AlbumRequest(Request):
             raise errors.Error("wrong page supplied")
 
         ret=self._client.call_GET(addSign=False,method="album.search",album=self._name,limit=limit,page=page)
-        return [AlbumRequest(client=self._client,name=xmlutils.extract_subelem(album,"name").text) for album in xmlutils.extract_elems(ret,".//albummatches/album")]
+        return [AlbumRequest(client=self._client,name=xmlutils.extract_subelem(album,"name").text, artist=xmlutils.extract_subelem(album,"artist")) for album in xmlutils.extract_elems(ret,".//albummatches/album")]
 
     def getBuylinks(self,autocorrect=0,country='united kingdom'):
         """contry: A country name, as defined by the ISO 3166-1 country names standard."""

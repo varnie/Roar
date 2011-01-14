@@ -34,8 +34,8 @@ if __name__=="__main__":
         venue=event.getVenue()
         print "event.getVenue: ",venue
         print "venue.getEvents: ", venue.getEvents()
-        print "venue.getPastEvents: ", venue.getPastEvents()
-        print "venue.search: ",  venue.search(1,1)
+        print "venue.getPastEvents: ", venue.getPastEvents(limit=5)
+        print "venue.search: ",  venue.search(limit=5)
 
         print "artist APIs"
         artist=requests.ArtistRequest(client,"Sepultura")
@@ -47,18 +47,18 @@ if __name__=="__main__":
         for tag in tags:
             print artist.removeTag(tag),
         print ""
-        print "artist.getShouts: ", artist.getShouts(2)
-        print "artist.getSimilar: ",artist.getSimilar()
+        print "artist.getShouts: ", artist.getShouts(limit=5)
+        print "artist.getSimilar: ",artist.getSimilar(limit=5)
         print "artist.share: ",artist.share(["varnie"],"tettttwoho! cool band!11")
         print "artist.shout: ",artist.shout("Horns up\m/")
-        print "artist.search: ", artist.search()
+        print "artist.search: ", artist.search(limit=5)
         print "artist.getEvents: ",artist.getEvents()
-        print "artist.getImages: ", artist.getImages()
+        print "artist.getImages: ", artist.getImages(limit=5)
         print "artist.getTopAlbums: ", artist.getTopAlbums()
         print "artist.getTopFans: ", artist.getTopFans()
         print "artist.getTopTags: ", artist.getTopTags()
         print "artist.getTopTracks: ", artist.getTopTracks()
-        print "artist.getPastEvents: ", artist.getPastEvents()
+        print "artist.getPastEvents: ", artist.getPastEvents(limit=5)
         print "artist.isStreamable: ", artist.isStreamable()
         print "artist.getListeners: ", artist.getListeners()
         print "artist.getPlayCount: ", artist.getPlayCount()
@@ -75,10 +75,10 @@ if __name__=="__main__":
             print track.removeTag(tag),
         print ""
         print "track.getCorrection: ", track.getCorrection()
-        print "track.getSimilar: ", track.getSimilar()
+        print "track.getSimilar: ", track.getSimilar(limit=5)
         print "track.getTopFans: ", track.getTopFans()
         print "track.getTopTags: ", track.getTopTags()
-        print "track.getShouts: ", track.getShouts(2)
+        print "track.getShouts: ", track.getShouts(limit=5)
         print "track.getName: ", track.getName()
         print "track.getUrl: ", track.getUrl()
         print "track.getID: ", track.getID()
@@ -92,12 +92,12 @@ if __name__=="__main__":
         print "track.unlove: ", track.unlove()
         print "track.getArtist: ", track.getArtist()
         print "track.getBuylinks: ", track.getBuylinks()
-        print "track.search: ", track.search()
+        print "track.search: ", track.search(limit=5)
 
         print "user APIs"
         user=requests.UserRequest(client,"varnie")
         print "user.shout: ", user.shout("this is a test message")
-        print "user.getShouts: ",user.getShouts(2)
+        print "user.getShouts: ",user.getShouts(limit=5)
 
         print "album APIs"
         album=requests.AlbumRequest(client,"Demigod","Behemoth")
@@ -108,12 +108,12 @@ if __name__=="__main__":
         for tag in tags:
             print album.removeTag(tag),
         print ""
-        print "album.getShouts: ",album.getShouts(2)
+        print "album.getShouts: ",album.getShouts(limit=5)
         print "album.getName: ", album.getName()
         print "album.getID: ", album.getID()
         print "album.getURL: ", album.getURL()
         print "album.getReleaseDate: ", album.getReleaseDate()
-        print "album.search: ", album.search()
+        print "album.search: ", album.search(limit=5)
         print "album.getListeners: ", album.getListeners()
         print "album.getPlayCount: ", album.getPlayCount()
         print "album.getImagesURLs: ", album.getImagesURLs()
