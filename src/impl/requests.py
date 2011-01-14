@@ -1,4 +1,3 @@
-import abc
 import xmlutils
 import hashlib
 import errors
@@ -8,7 +7,6 @@ import urllib2
 import re
 from collections import namedtuple
 
-TagType = namedtuple("Tag","name,url")
 ImageType = namedtuple("Image","title,url,dateadded,format,owner,sizes,thumbsup,thumbsdown")
 
 def url_fix(s, charset='utf-8'):
@@ -25,9 +23,6 @@ def _statusHandler(ret):
 
 def _getShoutsHandler(ret):
     return [(xmlutils.extract_subelem(shout,"author").text, xmlutils.extract_subelem(shout,"body").text) for shout in xmlutils.extract_elems(ret,".//shouts/shout") ]
-
-def _getTagsHandler(ret):
-    return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
 class Request(object):
 
@@ -244,7 +239,7 @@ class ArtistRequest(Request):
         for tag in xmlutils.extract_elems(ret,".//toptags/tag"):
             name=xmlutils.extract_subelem(tag,".//name").text
             url=xmlutils.extract_subelem(tag,".//url").text
-            result.append(TagType(name,url))
+            result.append(TagRequest(client=self._client, name=name,url=url))
 
         return result
 
@@ -300,11 +295,11 @@ class ArtistRequest(Request):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
-        ret=self._client.call_POST(method='artist.addTags',artist=self._name,tags=','.join(tags))
+        ret=self._client.call_POST(method='artist.addTags',artist=self._name,tags=','.join(tag.getName() for tag in tags))
         return _statusHandler(ret)
 
     def removeTag(self,tag):
-        ret=self._client.call_POST(method='artist.removeTag',artist=self._name,tag=tag)
+        ret=self._client.call_POST(method='artist.removeTag',artist=self._name,tag=tag.getName())
         return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
@@ -312,7 +307,7 @@ class ArtistRequest(Request):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='artist.getTags',artist=self._name,autocorrect=autocorrect)
-        return _getTagsHandler(ret)
+        return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
@@ -551,11 +546,11 @@ class TrackRequest(Request):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
-        ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist,tags=','.join(tags))
+        ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist,tags=','.join(tag.getName() for tag in tags))
         return _statusHandler(ret)
 
     def removeTag(self,tag):
-        ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist,tag=tag)
+        ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist,tag=tag.getName())
         return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
@@ -563,7 +558,7 @@ class TrackRequest(Request):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist,autocorrect=autocorrect)
-        return _getTagsHandler(ret)
+        return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
     def getName(self):
         return self._name
@@ -592,7 +587,7 @@ class TrackRequest(Request):
         for tag in xmlutils.extract_elems(ret,".//toptags/tag"):
             name=xmlutils.extract_subelem(tag,".//name").text
             url=xmlutils.extract_subelem(tag,".//url").text
-            result.append(TagType(name,url))
+            result.append(TagRequest(client=self._client,name=name,url=url))
 
         return result
 
@@ -736,17 +731,17 @@ class AlbumRequest(Request):
 
     def getTopTags(self):
         ret = self._getInfo()
-        return [TagType(xmlutils.extract_subelem(tag,"name").text, xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//toptags/tag")]
+        return [TagRequest(client=self._client,name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//toptags/tag")]
 
     def addTags(self,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
-        ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist,tags=','.join(tags))
+        ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist,tags=','.join(tag.getName() for tag in tags))
         return _statusHandler(ret)
 
     def removeTag(self,tag):
-        ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist,tag=tag)
+        ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist,tag=tag.getName())
         return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
@@ -754,7 +749,7 @@ class AlbumRequest(Request):
             raise errors.Error("wrong autocorect supplied")
 
         ret=self._client.call_POST(method='album.getTags',album=self._name,artist=self._artist,autocorrect=autocorrect)
-        return _getTagsHandler(ret)
+        return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
@@ -813,12 +808,13 @@ class AlbumRequest(Request):
         return result
 
 class TagRequest(Request):
-    def __init__(self,client,name):
+    def __init__(self,client,name,url):
         super(TagRequest, self).__init__(client)
         self._name = name
+        self._url=url
 
     def __repr__(self):
-        return 'TagRequest(%r,%r)' % (self._client,self._name)
+        return 'TagRequest(%r,%r,%r)' % (self._client,self._name, self._url)
 
     def getName(self):
         return self._name
@@ -831,13 +827,13 @@ class TagRequest(Request):
             raise errors.Error("wrong page supplied")
 
         ret=self._client.call_GET(method="tag.search",tag=self._name,limit=limit,page=page)
-        return [TagRequest(client=self._client,name=xmlutils.extract_subelem(tag,"name").text) for tag in xmlutils.extract_elems(ret,".//tagmatches/tag")]
+        return [TagRequest(client=self._client,name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url")) for tag in xmlutils.extract_elems(ret,".//tagmatches/tag")]
 
     def _getInfo(self):
         return self._client.call_GET(method="tag.getInfo",tag=self._name)
 
     def getUrl(self):
-        return xmlutils.extract_elem(self._getInfo(),".//tag/url").text
+        return self._url
 
     def getReach(self):
         return xmlutils.extract_elem(self._getInfo(),".//tag/reach").text
@@ -856,3 +852,4 @@ class TagRequest(Request):
 
     def getWikiContent(self):
         return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/content").text
+

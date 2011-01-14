@@ -40,7 +40,7 @@ if __name__=="__main__":
         print "artist APIs"
         artist=requests.ArtistRequest(client,"Sepultura")
         print "artist.getCorrection: ",artist.getCorrection()
-        tags=["metal","black","death","ZZZ"]
+        tags=[requests.TagRequest(client=client,name="black metal",url="www.last.fm/tag/black%20metal"), requests.TagRequest(client=client,name="death metal",url="www.last.fm/tag/death%20metal")]
         print "artist.addTags: ", artist.addTags(tags)
         print "artist.getTags: ", artist.getTags()
         print "artist.removeTag: "
@@ -124,7 +124,7 @@ if __name__=="__main__":
         print "user.getShouts: ", user.getShouts()
 
         print "tags APIs"
-        tag=requests.TagRequest(client=client,name='black metal')
+        tag=tags[0]
         print "tag.getName: ", tag.getName()
         print "tag.getUrl: ", tag.getUrl()
         print "tag.search: ", tag.search()
