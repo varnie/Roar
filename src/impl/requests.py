@@ -667,7 +667,7 @@ class TrackRequest(Request):
     def getCorrection(self):
         ret=self._client.call_GET(method="track.getCorrection",track=self._name,artist=self._artist)
         return [i.text for i in xmlutils.extract_elems(ret,".//correction/track/name")]
-    
+
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
             raise errors.Error("wrong limit supplied")
@@ -680,7 +680,7 @@ class TrackRequest(Request):
 
         ret=self._client.call_GET(method="track.getShouts",track=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
         return _getShoutsHandler(ret)
-    
+
     def getSimilar(self,limit=50,autocorrect=0):
         if limit < 0:
             raise errors.Error("wrong limit supplied")
@@ -720,7 +720,7 @@ class AlbumRequest(Request):
         return xmlutils.extract_elem(self._getInfo(), ".//album/releasedate").text
 
     def getListeners(self):
-        return xmlutils.extract_elem(self._getInfo(), ".//album/listeners").text 
+        return xmlutils.extract_elem(self._getInfo(), ".//album/listeners").text
 
     def getPlayCount(self,username=None):
         return xmlutils.extract_elem(self._getInfo(username=username), ".//album/playcount").text
@@ -811,3 +811,48 @@ class AlbumRequest(Request):
                 result.append(buyLink)
 
         return result
+
+class TagRequest(Request):
+    def __init__(self,client,name):
+        super(TagRequest, self).__init__(client)
+        self._name = name
+
+    def __repr__(self):
+        return 'TagRequest(%r,%r)' % (self._client,self._name)
+
+    def getName(self):
+        return self._name
+
+    def search(self,limit=30,page=1):
+        if limit < 0:
+            raise errors.Error("wrong limit supplied")
+
+        if page < 0 or page > limit:
+            raise errors.Error("wrong page supplied")
+
+        ret=self._client.call_GET(method="tag.search",tag=self._name,limit=limit,page=page)
+        return [TagRequest(client=self._client,name=xmlutils.extract_subelem(tag,"name").text) for tag in xmlutils.extract_elems(ret,".//tagmatches/tag")]
+
+    def _getInfo(self):
+        return self._client.call_GET(method="tag.getInfo",tag=self._name)
+
+    def getUrl(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/url").text
+
+    def getReach(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/reach").text
+
+    def getTaggings(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/taggings").text
+
+    def isStreamable(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/streamable").text == "1" 
+
+    def getWikiPublished(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/published").text
+
+    def getWikiSummary(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/summary").text
+
+    def getWikiContent(self):
+        return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/content").text

@@ -94,11 +94,6 @@ if __name__=="__main__":
         print "track.getBuylinks: ", track.getBuylinks()
         print "track.search: ", track.search(limit=5)
 
-        print "user APIs"
-        user=requests.UserRequest(client,"varnie")
-        print "user.shout: ", user.shout("this is a test message")
-        print "user.getShouts: ",user.getShouts(limit=5)
-
         print "album APIs"
         album=requests.AlbumRequest(client,"Demigod","Behemoth")
         print "album.share: ", album.share(["varnie"],"album share")
@@ -128,5 +123,16 @@ if __name__=="__main__":
         print "user.shout: ", user.shout("this is a test message")
         print "user.getShouts: ", user.getShouts()
 
+        print "tags APIs"
+        tag=requests.TagRequest(client=client,name='black metal')
+        print "tag.getName: ", tag.getName()
+        print "tag.getUrl: ", tag.getUrl()
+        print "tag.search: ", tag.search()
+        print "tag.getReach: ", tag.getReach()
+        print "tag.isStreamable:  ", tag.isStreamable()
+        print "tag.getTaggings: ", tag.getTaggings()
+        print "tag.getWikiPublished: ", tag.getWikiPublished()
+        print "tag.getWikiSummary: ", tag.getWikiSummary()
+        print "tag.getWikiContent: ", tag.getWikiContent()
     except errors.Error, e:
        print e
