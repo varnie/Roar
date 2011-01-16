@@ -2,9 +2,9 @@ import xml.etree.ElementTree as xml
 
 def extract_elem(body, elemName, searchInRoot=False):
     global _parser
-    
+
     _parser.supplyXML(body)
-    return _parser.extract_elem(elemName,searchInRoot)
+    return _parser.extract_elem(elemName, searchInRoot)
 
 def extract_elems(body, elemName):
     global _parser
@@ -19,13 +19,12 @@ def extract_subelem(ownerElem, elemName):
     return ownerElem.find(elemName)
 
 class XMLParser(object):
-
     def __init__(self):
-        super(XMLParser,self).__init__()
+        super(XMLParser, self).__init__()
         self._XMLbody=None
         self._xmlTree=None
-    
-    def supplyXML(self,XMLbody):
+
+    def supplyXML(self, XMLbody):
         self._XMLbody=XMLbody
         self._createXMLTree()
 

@@ -3,7 +3,7 @@ import impl.errors as errors
 
 if __name__=="__main__":
 
-    #setup required data
+#setup required data
     URL="ws.audioscrobbler.com"
 
     api_key=raw_input("Please enter your api_key: ")
@@ -13,34 +13,35 @@ if __name__=="__main__":
 
     #do smth interesting!
     try:
-        client=requests.Client(URL,api_key,api_secret,username,userpass)
+        client=requests.Client(URL, api_key, api_secret, username, userpass)
 
         print "event APIs"
-        event=requests.EventRequest(client,id=1073657)
-        print "event.share: ", event.share(["varnie"],"this event is shared with you!")
+        event=requests.EventRequest(client, id=1073657)
+        print "event.share: ", event.share(["varnie"], "this event is shared with you!")
         print "event.getArtists: ", event.getArtists()
-        print "event.getDescription: ",event.getDescription()
-        print "event.getAttendance: ",event.getAttendance()
+        print "event.getDescription: ", event.getDescription()
+        print "event.getAttendance: ", event.getAttendance()
         print "event.getTitle: ", event.getTitle()
         print "event.getUrl: ", event.getUrl()
         print "event.getReviews: ", event.getReviews()
-        print "event.getStartDate: ",event.getStartDate()
-        print "event.getImagesURLs: ",event.getImagesURLs()
-        print "event.getWebsite: ",event.getWebsite()
+        print "event.getStartDate: ", event.getStartDate()
+        print "event.getImagesURLs: ", event.getImagesURLs()
+        print "event.getWebsite: ", event.getWebsite()
         print "event.getAttendees: ", event.getAttendees()
         print "event.attend: ", event.attend(0)
 
         print "venue APIs"
         venue=event.getVenue()
-        print "event.getVenue: ",venue
+        print "event.getVenue: ", venue
         print "venue.getEvents: ", venue.getEvents()
         print "venue.getPastEvents: ", venue.getPastEvents(limit=5)
-        print "venue.search: ",  venue.search(limit=5)
+        print "venue.search: ", venue.search(limit=5)
 
         print "artist APIs"
         artist=requests.ArtistRequest(client=client, name="Behemot")
-        print "artist.getCorrection: ",artist.getCorrection()
-        tags=[requests.TagRequest(client=client,name="black metal",url="www.last.fm/tag/black%20metal"), requests.TagRequest(client=client,name="death metal",url="www.last.fm/tag/death%20metal")]
+        print "artist.getCorrection: ", artist.getCorrection()
+        tags=[requests.TagRequest(client=client, name="black metal", url="www.last.fm/tag/black%20metal"),
+              requests.TagRequest(client=client, name="death metal", url="www.last.fm/tag/death%20metal")]
         print "artist.addTags: ", artist.addTags(tags)
         print "artist.getTags: ", artist.getTags()
         print "artist.removeTag: "
@@ -48,11 +49,11 @@ if __name__=="__main__":
             print artist.removeTag(tag),
         print ""
         print "artist.getShouts: ", artist.getShouts(limit=5)
-        print "artist.getSimilar: ",artist.getSimilar(limit=5)
-        print "artist.share: ",artist.share(["varnie"],"tettttwoho! cool band!11")
-        print "artist.shout: ",artist.shout("Horns up\m/")
+        print "artist.getSimilar: ", artist.getSimilar(limit=5)
+        print "artist.share: ", artist.share(["varnie"], "tettttwoho! cool band!11")
+        print "artist.shout: ", artist.shout("Horns up\m/")
         print "artist.search: ", artist.search(limit=5)
-        print "artist.getEvents: ",artist.getEvents()
+        print "artist.getEvents: ", artist.getEvents()
         print "artist.getImages: ", artist.getImages(limit=5)
         print "artist.getTopAlbums: ", artist.getTopAlbums()
         print "artist.getTopFans: ", artist.getTopFans()
@@ -66,8 +67,8 @@ if __name__=="__main__":
         print "artist.getBioContent: ", artist.getBioContent()
 
         print "track APIs"
-        track=requests.TrackRequest(client=client, name="LAM",artist=artist)
-        print "track.share: ", track.share(["varnie"],"tetwoo! this track is shared with you")
+        track=requests.TrackRequest(client=client, name="LAMMNMMMMMMMMMM", artist=artist)
+        print "track.share: ", track.share(["varnie"], "tetwoo! this track is shared with you")
         print "track.addTags: ", track.addTags(tags)
         print "track.getTags: ", track.getTags()
         print "track.removeTag: "
@@ -85,7 +86,7 @@ if __name__=="__main__":
         print "track.getDuration: ", track.getDuration()
         print "track.getListeners: ", track.getListeners()
         print "track.getPlaycount: ", track.getPlaycount()
-        print "track.getAlbum: ", track.getAlbum(autocorrect=1)
+        print "track.getAlbum: ", track.getAlbum(autocorrect=0)
         print "track.ban: ", track.ban()
         print "track.unban: ", track.unban()
         print "track.love: ", track.love()
@@ -95,15 +96,15 @@ if __name__=="__main__":
         print "track.search: ", track.search(limit=5)
 
         print "album APIs"
-        album=requests.AlbumRequest(client,name="Demigod",artist=artist)
-        print "album.share: ", album.share(["varnie"],"album share")
+        album=requests.AlbumRequest(client, name="Demigod", artist=artist)
+        print "album.share: ", album.share(["varnie"], "album share")
         print "album.addTags: ", album.addTags(tags)
         print "album.getTags: ", album.getTags()
         print "album.removeTag: ",
         for tag in tags:
             print album.removeTag(tag),
         print ""
-        print "album.getShouts: ",album.getShouts(limit=5)
+        print "album.getShouts: ", album.getShouts(limit=5)
         print "album.getName: ", album.getName()
         print "album.getID: ", album.getID()
         print "album.getURL: ", album.getURL()
@@ -119,7 +120,7 @@ if __name__=="__main__":
         print "album.getWikiContent: ", album.getWikiContent()
 
         print "user APIs"
-        user=requests.UserRequest(client=client,name='varnie')
+        user=requests.UserRequest(client=client, name='varnie')
         print "user.shout: ", user.shout("this is a test message")
         print "user.getShouts: ", user.getShouts()
 
@@ -141,4 +142,4 @@ if __name__=="__main__":
         print "library.addTrack: ", library.addTrack(track=track)
         print "library.addAlbum: ", library.addAlbum(album=album)
     except errors.Error, e:
-       print e
+        print e

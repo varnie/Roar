@@ -1,6 +1,6 @@
 class Error(Exception):
-        def __init__(self, *args, **kwargs):
-            super(Error, self).__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super(Error, self).__init__(*args, **kwargs)
 
 class BadResponseError(Error):
     def __init__(self):
@@ -19,7 +19,7 @@ class ResponseError(Error):
         self._errorMsg=errorMsg
 
     def __str__(self):
-        return "LastFM Error %s:%s" % (self._errorCode, self._errorMsg)
+        return "LastFM Error %s: %s" % (self._errorCode, self._errorMsg)
 
     def __repr__(self):
-        return "ResponseError(%s %s)" % (self._errorCode, self._errorMsg)
+        return "ResponseError(%s, %s)" % (self._errorCode, self._errorMsg)
