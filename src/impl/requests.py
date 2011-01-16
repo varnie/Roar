@@ -109,7 +109,7 @@ class Client(object):
     def call_POST(self,**paramsMap):
         paramsMap.update({'sk':self.mobileSession, 'api_key':self._api_key})
         self._fix_params(paramsMap)
-        paramsMap.update({'api_sig':self._get_sign(paramsMap)}) #api_sig must be calculated after all params have been supplied
+        paramsMap.update({'api_sig':self._get_sign(paramsMap)}) #NB: api_sig must be calculated after all params have been supplied
 
         params=urllib.urlencode(paramsMap)
         url=url_fix("http://%s/2.0/" % (self._URL,))
@@ -174,6 +174,9 @@ class UserRequest(Request):
         ret=self._client.call_GET(method="user.getShouts",user=self._name,autocorrect=autocorrect,limit=limit,page=page)
         return _getShoutsHandler(ret)
 
+    def getName(self):
+        return self._name
+
 class ArtistRequest(Request):
 
     re_email=re.compile(r"(?:^|\s)[-a-z0-9_.]+@(?:[-a-z0-9]+\.)+[a-z]{2,6}(?:\s|$)",re.IGNORECASE)
@@ -189,8 +192,9 @@ class ArtistRequest(Request):
         return self._name
 
     def getCorrection(self):
-        ret=self._client.call_GET(addSign=False,method="artist.getCorrection",artist=self._name)
-        return [i.text for i in xmlutils.extract_elems(ret,".//correction/artist/name")]
+        ret=self._client.call_GET(method="artist.getCorrection",artist=self._name)
+
+        return [ArtistRequest(client=self._client,name=the_name) for the_name in xmlutils.extract_elems(ret,".//correction/artist/name")]
 
     def getPastEvents(self,autocorrect=0,limit=50,page=1):
         if limit < 0:
@@ -198,7 +202,7 @@ class ArtistRequest(Request):
 
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
-        
+
         res=self._client.call_GET(method="artist.getPastEvents",artist=self._name,page=page,autocorrect=autocorrect,limit=limit)
         return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in xmlutils.extract_elems(res,".//events/event")]
 
@@ -262,17 +266,25 @@ class ArtistRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        ret=self._client.call_GET(addSign=False,method="artist.search",artist=self._name,limit=limit,page=page)
-        return [ArtistRequest(client=self._client,name=xmlutils.extract_subelem(artist,"name").text) for artist in
-            xmlutils.extract_elems(ret,".//artistmatches/artist")]
+        ret=self._client.call_GET(method="artist.search",artist=self._name,limit=limit,page=page)
+
+        result=[]
+        for artist in xmlutils.extract_elems(ret, ".//artistmatches/artist"):
+            the_name = xmlutils.extract_subelem(artist,"name").text
+            if self._name != the_name:
+                result.append(ArtistRequest(client=self._client,name=the_name))
+            else:
+                if not self in result:
+                    result.append(self)
+
+        return result
 
     def getEvents(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(addSign=False,method="artist.getEvents",artist=self._name,autocorrect=autocorrect)
-        return [EventRequest(client=self._client, id=id.text) for id in
-                xmlutils.extract_elems(ret,".//events/event/id")]
+        ret=self._client.call_GET(method="artist.getEvents",artist=self._name,autocorrect=autocorrect)
+        return [EventRequest(client=self._client, id=id.text) for id in xmlutils.extract_elems(ret,".//events/event/id")]
 
     def shout(self,message):
         ret=self._client.call_POST(artist=self._name,method="artist.shout",message=message)
@@ -309,13 +321,14 @@ class ArtistRequest(Request):
         ret=self._client.call_POST(method='artist.getTags',artist=self._name,autocorrect=autocorrect)
         return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
+    #TODO: refactor passing User objects instead of plain strings
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
             raise errors.Error("wrong recipients count supplied")
 
         for user in recipients:
-            if "@" in user and not Request.re_email.match(user):
-                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
+            if "@" in user and not ArtistRequest.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (user))
 
         if public not in (0,1):
             raise errors.Error("wrong public supplied")
@@ -330,8 +343,16 @@ class ArtistRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(addSign=False,method="artist.getSimilar",artist=self._name,limit=limit,autocorrect=autocorrect)
-        return [ArtistRequest(client=self._client,name=xmlutils.extract_subelem(artist,"name").text) for artist in xmlutils.extract_elems(ret,".//similarartists/artist")]
+        ret=self._client.call_GET(method="artist.getSimilar",artist=self._name,limit=limit,autocorrect=autocorrect)
+
+        result=[]
+        for artist in xmlutils.extract_elems(ret,".//similarartists/artist"):
+            print artist
+            the_name = xmlutils.extract_subelem(artist,"name").text
+            if self._name != the_name:
+                result.append(ArtistRequest(client=self._client, name=the_name))
+
+        return result
 
     def getImages(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
@@ -376,7 +397,7 @@ class ArtistRequest(Request):
         return xmlutils.extract_elem(self._getInfo(), ".//artist/stats/listeners").text
 
     def getPlayCount(self,username=None):
-        return xmlutils.extract_elem(self._getInfo(username=None), ".//artist/stats/playcount").text
+        return xmlutils.extract_elem(self._getInfo(username=username), ".//artist/stats/playcount").text
 
     def getBioSummary(self):
         return xmlutils.extract_elem(self._getInfo(), ".//artist/bio/summary").text
@@ -395,7 +416,7 @@ class VenueRequest(Request):
         return "VenueRequest(%r,%r,%r)" % (self._client,self._name,self._id)
 
     def getEvents(self):
-        res=self._client.call_GET(addSign=False,method="venue.getEvents",venue=self._id)
+        res=self._client.call_GET(method="venue.getEvents",venue=self._id)
         return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in xmlutils.extract_elems(res,".//events/event")]
 
     def getPastEvents(self,page=1,limit=50):
@@ -405,10 +426,9 @@ class VenueRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        res=self._client.call_GET(addSign=False,method="venue.getPastEvents",venue=self._id,page=page,limit=limit)
+        res=self._client.call_GET(method="venue.getPastEvents",venue=self._id,page=page,limit=limit)
 
-        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for
-                event in xmlutils.extract_elems(res,".//events/event")]
+        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in xmlutils.extract_elems(res,".//events/event")]
 
     def search(self,page=1,limit=50):
         if limit < 0:
@@ -417,8 +437,19 @@ class VenueRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        res=self._client.call_GET(addSign=False,method="venue.search",venue=self._name,limit=limit,page=page)
-        return [EventRequest(client=self._client,id=xmlutils.extract_subelem(event,"id").text) for event in  xmlutils.extract_elems(res,".//results/venuematches/venue")]
+        res=self._client.call_GET(method="venue.search",venue=self._name,limit=limit,page=page)
+
+        result = []
+        for venue in xmlutils.extract_elems(res,".//results/venuematches/venue"):
+            the_id = xmlutils.extract_subelem(venue,"id").text
+            if self._id != the_id:
+                the_name = xmlutils.extract_subelem(venue, "name").text
+                result.append(VenueRequest(client=self._client,id=the_id,name=the_name))
+            else:
+                if self not in result:
+                    result.append(self)
+
+        return result
 
 class EventRequest(Request):
 
@@ -453,8 +484,7 @@ class EventRequest(Request):
         return _statusHandler(ret)
 
     def getArtists(self):
-        return [ArtistRequest(client=self._client, name=artist.text) for artist in
-                xmlutils.extract_elems(self._getInfo(),".//event/artists/artist")]
+        return [ArtistRequest(client=self._client, name=artist.text) for artist in xmlutils.extract_elems(self._getInfo(),".//event/artists/artist")]
 
     def getAttendance(self):
         return xmlutils.extract_elem(self._getInfo(),".//event/attendance").text
@@ -483,15 +513,16 @@ class EventRequest(Request):
         return xmlutils.extract_elem(self._getInfo(),".//event/website").text
 
     def _getInfo(self):
-        return self._client.call_GET(addSign=False,method="event.getInfo",event=self._id)
+        return self._client.call_GET(method="event.getInfo",event=self._id)
 
+    #TODO: refactor passing User objects instead of plain strings
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
             raise errors.Error("wrong recipients count supplied")
 
         for user in recipients:
-            if "@" in user and not Request.re_email.match(user):
-                raise errors.Error("wrong recipient supplied '%s'" % (recipient))
+            if "@" in user and not ArtistRequest.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (user))
 
         if public not in (0,1):
             raise errors.Error("wrong public supplied")
@@ -510,7 +541,7 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        return self._client.call_GET(method="track.getInfo",track=self._name,artist=self._artist,autocorrect=autocorrect,username=username)
+        return self._client.call_GET(method="track.getInfo",track=self._name,artist=self._artist.getName(),autocorrect=autocorrect,username=username)
 
     def __repr(self):
         return 'TrackRequest(%r,%r,%r)' % (self._client,self._name,self._artist)
@@ -525,39 +556,40 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(addSign=False,method="track.getShouts",track=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
+        ret=self._client.call_GET(method="track.getShouts",track=self._name,artist=self._artist.getName(),autocorrect=autocorrect,limit=limit,page=page)
         return _getShoutsHandler(ret)
 
+#TODO: refactor passing User objects instead of plain strings
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
             raise errors.Error("wrong recipients count supplied")
 
         for user in recipients:
-            if "@" in user and not Request.re_email.match(user):
-                raise errors.Error("wrong recipient supplied '%s'" % (recipient,))
+            if "@" in user and not ArtistRequest.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (user,))
 
         if public not in (0,1):
             raise errors.Error("wrong public supplied")
 
-        ret=self._client.call_POST(track=self._name,artist=self._artist,method="track.share",message=message,public=public,recipient=','.join(recipients))
+        ret=self._client.call_POST(track=self._name,artist=self._artist.getName(),method="track.share",message=message,public=public,recipient=','.join(recipients))
         return _statusHandler(ret)
 
     def addTags(self,tags):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
-        ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist,tags=','.join(tag.getName() for tag in tags))
+        ret=self._client.call_POST(method='track.addTags',track=self._name,artist=self._artist.getName(),tags=','.join(tag.getName() for tag in tags))
         return _statusHandler(ret)
 
     def removeTag(self,tag):
-        ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist,tag=tag.getName())
+        ret=self._client.call_POST(method='track.removeTag',track=self._name,artist=self._artist.getName(),tag=tag.getName())
         return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
 
-        ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist,autocorrect=autocorrect)
+        ret=self._client.call_POST(method='track.getTags',track=self._name,artist=self._artist.getName(),autocorrect=autocorrect)
         return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
     def getName(self):
@@ -582,7 +614,7 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="track.getTopTags",autocorrect=autocorrect,artist=self._artist,track=self._name)
+        ret=self._client.call_GET(method="track.getTopTags",autocorrect=autocorrect,artist=self._artist.getName(),track=self._name)
         result=[]
         for tag in xmlutils.extract_elems(ret,".//toptags/tag"):
             name=xmlutils.extract_subelem(tag,".//name").text
@@ -595,7 +627,7 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="track.getTopFans",autocorrect=autocorrect,artist=self._artist,track=self._name)
+        ret=self._client.call_GET(method="track.getTopFans",autocorrect=autocorrect,artist=self._artist.getName(),track=self._name)
         result=[]
         for user in xmlutils.extract_elems(ret,".//topfans/user"):
             name=xmlutils.extract_subelem(user,".//name").text
@@ -603,45 +635,45 @@ class TrackRequest(Request):
 
         return result
 
-    def getAlbum(self):
-        title= xmlutils.extract_elem (self._getInfo(),".//track/album/title").text
-        return AlbumRequest(client=self._client,name=title,artist=self._artist)
+    def getAlbum(self,autocorrect=0):
+        title= xmlutils.extract_elem(self._getInfo(autocorrect=autocorrect),".//track/album/title").text
+        return AlbumRequest(client=self._client,name=title,artist=self._artist.getName())
 
     def getArtist(self):
         return self._artist
 
     def ban(self):
-        ret=self._client.call_POST(method="track.ban",track=self._name,artist=self._artist)
+        ret=self._client.call_POST(method="track.ban",track=self._name,artist=self._artist.getName())
         return xmlutils.extract_elem(ret,"status",True)
 
     def unban(self):
-        ret=self._client.call_POST(method="track.unban",track=self._name,artist=self._artist)
+        ret=self._client.call_POST(method="track.unban",track=self._name,artist=self._artist.getName())
         return xmlutils.extract_elem(ret,"status",True)
 
     def love(self):
-        ret=self._client.call_POST(method="track.love",track=self._name,artist=self._artist)
+        ret=self._client.call_POST(method="track.love",track=self._name,artist=self._artist.getName())
         return xmlutils.extract_elem(ret,"status",True)
 
     def unlove(self):
-        ret=self._client.call_POST(method="track.unlove",track=self._name,artist=self._artist)
+        ret=self._client.call_POST(method="track.unlove",track=self._name,artist=self._artist.getName())
         return xmlutils.extract_elem(ret,"status",True)
 
     def getBuylinks(self,autocorrect=0,country='united kingdom'):
-        """contry: A country name, as defined by the ISO 3166-1 country names standard."""
+        """country: A country name, as defined by the ISO 3166-1 country names standard."""
 
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="track.getBuylinks",country=country,track=self._name,artist=self._artist,autocorrect=autocorrect)
+        ret=self._client.call_GET(method="track.getBuylinks",country=country,track=self._name,artist=self._artist.getName(),autocorrect=autocorrect)
 
         result=[]
         for affiliation in xmlutils.extract_elems(ret,".//affiliations/physicals/affiliation"):
-                buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
-                result.append(buyLink)
+            buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
+            result.append(buyLink)
 
         for affiliation in xmlutils.extract_elems(ret,".//affiliations/downloads/affiliation"):
-                buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
-                result.append(buyLink)
+            buyLink=xmlutils.extract_subelem(affiliation,".//buyLink").text
+            result.append(buyLink)
 
         return result
 
@@ -656,12 +688,29 @@ class TrackRequest(Request):
 
         artist=artist if artist else self._artist
 
-        ret=self._client.call_GET(method="track.search",track=self._name,artist=artist,limit=limit,page=page)
-        return [TrackRequest(client=self._client,name=xmlutils.extract_subelem(track,"name").text, artist=xmlutils.extract_subelem(track,"artist").text) for track in xmlutils.extract_elems(ret,".//trackmatches/track")]
+        ret=self._client.call_GET(method="track.search",track=self._name,artist=artist.getName(),limit=limit,page=page)
+
+        result=[]
+        for track in xmlutils.extract_elems(ret,".//trackmatches/track"):
+            the_name= xmlutils.extract_subelem(track, "name").text
+            if self._name != the_name:
+                result.append(TrackRequest(client=self._client, name = the_name, artist=artist))
+            else:
+                if self not in result:
+                    result.append(self)
+
+        return result
 
     def getCorrection(self):
-        ret=self._client.call_GET(method="track.getCorrection",track=self._name,artist=self._artist)
-        return [i.text for i in xmlutils.extract_elems(ret,".//correction/track/name")]
+        ret=self._client.call_GET(method="track.getCorrection",track=self._name,artist=self._artist.getName())
+
+        result=[]
+        for track in xmlutils.extract_elems(ret, ".//correction/track"):
+            the_name = xmlutils.extract_subelem(track, "name").text
+            the_artist = xmlutils.extract_subelem(track, "artist/name").text
+            result.append(TrackRequest(client=self._client, name=the_name, artist=the_artist))
+
+        return result
 
     def getShouts(self,limit=50,autocorrect=0,page=None):
         if limit < 0:
@@ -673,7 +722,7 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="track.getShouts",track=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
+        ret=self._client.call_GET(method="track.getShouts",track=self._name,artist=self._artist.getName(),autocorrect=autocorrect,limit=limit,page=page)
         return _getShoutsHandler(ret)
 
     def getSimilar(self,limit=50,autocorrect=0):
@@ -683,8 +732,16 @@ class TrackRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="track.getSimilar",track=self._name,artist=self._artist,limit=limit,autocorrect=autocorrect)
-        return [TrackRequest(client=self._client,name=xmlutils.extract_subelem(track,"name").text, artist=xmlutils.extract_subelem(track,"artist/name").text) for track in xmlutils.extract_elems(ret,".//similartracks/track")] 
+        ret=self._client.call_GET(method="track.getSimilar",track=self._name,artist=self._artist.getName(),limit=limit,autocorrect=autocorrect)
+
+        result=[]
+        for track in xmlutils.extract_elems(ret,".//similartracks/track"):
+            the_name=xmlutils.extract_subelem(track, "name").text
+            the_artist=xmlutils.extract_subelem(track, "artist/name").text
+            if self._artist != the_artist or self._name != the_name:
+                result.append(TrackRequest(client=self._client,name=the_name,artist=the_artist))
+
+        return result
 
 class AlbumRequest(Request):
 
@@ -696,11 +753,14 @@ class AlbumRequest(Request):
     def __repr__(self):
         return "AlbumRequest(%r,%r,%r)" % (self._client,self._name,self._artist)
 
+    def getArtist(self):
+        return self._artist
+
     def _getInfo(self,autocorrect=0,username=None,lang='en'):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        return self._client.call_GET(method="album.getInfo",album=self._name,artist=self._artist,autocorrect=autocorrect,username=username,lang=lang)
+        return self._client.call_GET(method="album.getInfo",album=self._name,artist=self._artist.getName(),autocorrect=autocorrect,username=username,lang=lang)
 
     def getName(self):
         return self._name
@@ -737,32 +797,33 @@ class AlbumRequest(Request):
         if len(tags) > 10:
             raise errors.Error("too many tags supplied. Max 10 tags")
 
-        ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist,tags=','.join(tag.getName() for tag in tags))
+        ret=self._client.call_POST(method='album.addTags',album=self._name,artist=self._artist.getName(),tags=','.join(tag.getName() for tag in tags))
         return _statusHandler(ret)
 
     def removeTag(self,tag):
-        ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist,tag=tag.getName())
+        ret=self._client.call_POST(method='album.removeTag',album=self._name,artist=self._artist.getName(),tag=tag.getName())
         return _statusHandler(ret)
 
     def getTags(self,autocorrect=0):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorect supplied")
 
-        ret=self._client.call_POST(method='album.getTags',album=self._name,artist=self._artist,autocorrect=autocorrect)
+        ret=self._client.call_POST(method='album.getTags',album=self._name,artist=self._artist.getName(),autocorrect=autocorrect)
         return [TagRequest(client=self._client, name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url").text) for tag in xmlutils.extract_elems(ret,".//tags/tag")]
 
+#TODO: refactor passing User objects instead of plain strings
     def share(self,recipients,message=None,public=0):
         if len(recipients) < 0 or len(recipients) > 10:
             raise errors.Error("wrong recipients count supplied")
 
         for user in recipients:
-            if "@" in user and not Request.re_email.match(user):
-                raise errors.Error("wrong recipient supplied '%s'" % (recipient,))
+            if "@" in user and not ArtistRequest.re_email.match(user):
+                raise errors.Error("wrong recipient supplied '%s'" % (user,))
 
         if public not in (0,1):
             raise errors.Error("wrong public supplied")
 
-        ret=self._client.call_POST(album=self._name,artist=self._artist,method="album.share",message=message,public=public,recipient=','.join(recipients))
+        ret=self._client.call_POST(album=self._name,artist=self._artist.getName(),method="album.share",message=message,public=public,recipient=','.join(recipients))
         return _statusHandler(ret)
 
     def getShouts(self,limit=50,autocorrect=0,page=None):
@@ -775,7 +836,7 @@ class AlbumRequest(Request):
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(addSign=False,method="album.getShouts",album=self._name,artist=self._artist,autocorrect=autocorrect,limit=limit,page=page)
+        ret=self._client.call_GET(method="album.getShouts",album=self._name,artist=self._artist.getName(),autocorrect=autocorrect,limit=limit,page=page)
         return _getShoutsHandler(ret)
 
     def search(self,limit=30,page=1):
@@ -785,16 +846,27 @@ class AlbumRequest(Request):
         if page < 0 or page > limit:
             raise errors.Error("wrong page supplied")
 
-        ret=self._client.call_GET(addSign=False,method="album.search",album=self._name,limit=limit,page=page)
-        return [AlbumRequest(client=self._client,name=xmlutils.extract_subelem(album,"name").text, artist=xmlutils.extract_subelem(album,"artist")) for album in xmlutils.extract_elems(ret,".//albummatches/album")]
+        ret=self._client.call_GET(method="album.search",album=self._name,limit=limit,page=page)
+
+        result=[]
+        for album in xmlutils.extract_elems(ret,".//albummatches/album"):
+            the_name = xmlutils.extract_subelem(album, "name").text
+            the_artist = xmlutils.extract_subelem(album, "artist").text
+            if self._name != the_name or self._artist.getName() != the_artist:
+                result.append(AlbumRequest(client=self._client,name=the_name, artist=the_artist))
+            else:
+                if self not in result:
+                    result.append(self)
+
+        return result
 
     def getBuylinks(self,autocorrect=0,country='united kingdom'):
-        """contry: A country name, as defined by the ISO 3166-1 country names standard."""
+        """country: A country name, as defined by the ISO 3166-1 country names standard."""
 
         if autocorrect not in (0,1):
             raise errors.Error("wrong autocorrect supplied")
 
-        ret=self._client.call_GET(method="album.getBuylinks",country=country,album=self._name,artist=self._artist,autocorrect=autocorrect)
+        ret=self._client.call_GET(method="album.getBuylinks",country=country,album=self._name,artist=self._artist.getName(),autocorrect=autocorrect)
 
         result=[]
         for affiliation in xmlutils.extract_elems(ret,".//affiliations/physicals/affiliation"):
@@ -827,7 +899,16 @@ class TagRequest(Request):
             raise errors.Error("wrong page supplied")
 
         ret=self._client.call_GET(method="tag.search",tag=self._name,limit=limit,page=page)
-        return [TagRequest(client=self._client,name=xmlutils.extract_subelem(tag,"name").text, url=xmlutils.extract_subelem(tag,"url")) for tag in xmlutils.extract_elems(ret,".//tagmatches/tag")]
+
+        result=[]
+        for tag in xmlutils.extract_elems(ret,".//tagmatches/tag"):
+            the_name=xmlutils.extract_subelem(tag,"name").text
+            the_url = xmlutils.extract_subelem(tag,"url").text
+            if self._name != the_name or self._url != the_url:
+                result.append(TagRequest(client=self._client,name=the_name,url=the_url))
+            else:
+                if self not in result:
+                    result.append(self)
 
     def _getInfo(self):
         return self._client.call_GET(method="tag.getInfo",tag=self._name)
@@ -842,7 +923,7 @@ class TagRequest(Request):
         return xmlutils.extract_elem(self._getInfo(),".//tag/taggings").text
 
     def isStreamable(self):
-        return xmlutils.extract_elem(self._getInfo(),".//tag/streamable").text == "1" 
+        return xmlutils.extract_elem(self._getInfo(),".//tag/streamable").text == "1"
 
     def getWikiPublished(self):
         return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/published").text
@@ -853,3 +934,21 @@ class TagRequest(Request):
     def getWikiContent(self):
         return xmlutils.extract_elem(self._getInfo(),".//tag/wiki/content").text
 
+class LibraryRequest(Request):
+    def __init__(self, client):
+        super(LibraryRequest, self).__init__(client)
+
+    def __repr__(self):
+        return 'LibraryRequest(%r)' % (self._client, )
+
+    def addAlbum(self, album):
+        ret=self._client.call_POST(method="library.addAlbum", artist=album.getArtist().getName(), album=album.getName())
+        return _statusHandler(ret)
+
+    def addTrack(self, track):
+        ret = self._client.call_POST(method="library.addTrack", artist=track.getArtist().getName(), track=track.getName())
+        return _statusHandler(ret)
+
+    def addArtist(self, artist):
+        ret=self._client.call_POST(method="library.addArtist", artist=artist.getName())
+        return _statusHandler(ret)

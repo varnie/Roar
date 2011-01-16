@@ -16,7 +16,7 @@ if __name__=="__main__":
         client=requests.Client(URL,api_key,api_secret,username,userpass)
 
         print "event APIs"
-        event=requests.EventRequest(client,1073657)
+        event=requests.EventRequest(client,id=1073657)
         print "event.share: ", event.share(["varnie"],"this event is shared with you!")
         print "event.getArtists: ", event.getArtists()
         print "event.getDescription: ",event.getDescription()
@@ -38,7 +38,7 @@ if __name__=="__main__":
         print "venue.search: ",  venue.search(limit=5)
 
         print "artist APIs"
-        artist=requests.ArtistRequest(client,"Sepultura")
+        artist=requests.ArtistRequest(client=client, name="Behemot")
         print "artist.getCorrection: ",artist.getCorrection()
         tags=[requests.TagRequest(client=client,name="black metal",url="www.last.fm/tag/black%20metal"), requests.TagRequest(client=client,name="death metal",url="www.last.fm/tag/death%20metal")]
         print "artist.addTags: ", artist.addTags(tags)
@@ -66,8 +66,8 @@ if __name__=="__main__":
         print "artist.getBioContent: ", artist.getBioContent()
 
         print "track APIs"
-        track=requests.TrackRequest(client,"LAM","Behemoth")
-        print "track.share: ", track.share(["varnie"],"tetwoo! this track is shared with you") 
+        track=requests.TrackRequest(client=client, name="LAM",artist=artist)
+        print "track.share: ", track.share(["varnie"],"tetwoo! this track is shared with you")
         print "track.addTags: ", track.addTags(tags)
         print "track.getTags: ", track.getTags()
         print "track.removeTag: "
@@ -85,7 +85,7 @@ if __name__=="__main__":
         print "track.getDuration: ", track.getDuration()
         print "track.getListeners: ", track.getListeners()
         print "track.getPlaycount: ", track.getPlaycount()
-        print "track.getAlbum: ", track.getAlbum()
+        print "track.getAlbum: ", track.getAlbum(autocorrect=1)
         print "track.ban: ", track.ban()
         print "track.unban: ", track.unban()
         print "track.love: ", track.love()
@@ -95,7 +95,7 @@ if __name__=="__main__":
         print "track.search: ", track.search(limit=5)
 
         print "album APIs"
-        album=requests.AlbumRequest(client,"Demigod","Behemoth")
+        album=requests.AlbumRequest(client,name="Demigod",artist=artist)
         print "album.share: ", album.share(["varnie"],"album share")
         print "album.addTags: ", album.addTags(tags)
         print "album.getTags: ", album.getTags()
@@ -134,5 +134,11 @@ if __name__=="__main__":
         print "tag.getWikiPublished: ", tag.getWikiPublished()
         print "tag.getWikiSummary: ", tag.getWikiSummary()
         print "tag.getWikiContent: ", tag.getWikiContent()
+
+        print "library APIs"
+        library=requests.LibraryRequest(client=client)
+        print "library.addArtist: ", library.addArtist(artist=artist)
+        print "library.addTrack: ", library.addTrack(track=track)
+        print "library.addAlbum: ", library.addAlbum(album=album)
     except errors.Error, e:
        print e
